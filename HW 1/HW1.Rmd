@@ -1,0 +1,162 @@
+---
+title: "Math 611 HW1"
+author: "Jeff Gould"
+date: "8/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+### 2 
+
+Consider the queue model discussed in class (i.e. a single server model).   As in class, assume that the interarrival times, $T_i$ are iid as are the service times $V_i$.   Assume further that each $T_i$ is exponentially distributed with rate $\lambda$ and each $V_i$ is exponentially distributed with rate $\mu$.  Let $X(t)$ be the number of customers waiting in line at time $t$.  Let $W_i$ be the waiting time of the $i$th individual.  Assume that initially the queue is empty, so $X(0) = 0$ and $W_1 = 0$.
+
+#### a) Determine $P(W_2 \ge c)$ for $c$ a positive number. (write down an integral and evaluate it, you won't need a computer). 
+
+
+
+#### b) Write down an integral expression for $P(W_3 \ge c)$ (You don't need to evaluate the integral, unless you want to.  Your answer may be the sum of two integrals.)
+
+
+#### c) Write a function  WaitingTimes(n $\lambda$, $\mu$) that samples the waiting times of the first $n$ customers.  Your function should return a vector of length $n$ with the sampled waiting time.  Show the output of your function for $n=10, \lambda=1, \mu=1$.
+
+```{r }
+waitingTimes <- function(n, lambda, mu){
+  
+  ### First, create a vector of length n for T_i's, the time between cutomer arrivals
+  T_i <- rexp(n, rate = lambda)
+  ### Turn T_i into a vector of arrival times, A
+  A <- cumsum(T_i)
+  
+  ### Now create vector of service time for each person
+  V <- rexp(n, rate = mu)
+  
+  ### Initialize W with W_1 = 0
+  W <- c(0)
+  
+  ### The departure time of the first customer is simply their service time + arrival time
+  D <- V[1] + A[1]
+  
+  for (i in 2:n) {
+    ## The wait time of the ith customer is max(0, D_(i-1) - A_i)
+    W[i] <- max(0, D[i - 1] - A[i])
+    
+    ## The departure time of the ith customer is their arrival time + their wait time + their service time
+    D[i] <- A[i] + W[i] + V[i]
+  }
+  
+  return(W)
+  
+}
+
+set.seed(123)
+waitingTimes(10,1,1)
+```
+
+#### d) Write a function plotQueue(t, $\lambda$, $\mu$) that simulates (in other words samples) the queue and plots $X(t)$ up to a time $t$.   Show a single simulation for $t=20$, $\lambda=1$, $\mu=1$.
+
+```{r }
+set.seed(123)
+plotQueue <- function(t, lambda, mu){
+  
+  T_i <- rexp(1, lambda)
+  
+  while (sum(T_i) <= t) {
+    T_i <- c(T_i, rexp(1, lambda))
+  }
+  
+  A <- cumsum(T_i)
+  n <- length(T_i)
+  ### Now create vector of service time for each person
+  V <- rexp(n, rate = mu)
+  
+  ### Initialize W with W_1 = 0
+  W <- c(0)
+  
+  ### The departure time of the first customer is simply their service time + arrival time
+  D <- V[1] + A[1]
+  
+  for (i in 2:n) {
+    ## The wait time of the ith customer is max(0, D_(i-1) - A_i)
+    W[i] <- max(0, D[i - 1] - A[i])
+    
+    ## The departure time of the ith customer is their arrival time + their wait time + their service time
+    D[i] <- A[i] + W[i] + V[i]
+  }
+  
+  steps <- sort(c(0,A,D))
+  steps <- steps[steps <= t]
+  
+  inqueue <- function(Arrival, Departure, time){
+    return(
+      if(Arrival <= time & time < Departure){1}else{0}
+    )
+    
+  }
+  
+  Xt <- sum(mapply(inqueue, A,D, time = steps[1]))
+  for (j in 2:length(steps)) {
+    Xt[j] = sum(mapply(inqueue, A,D, time = steps[j]))
+  }
+  
+  X <- data.frame(steps, Xt)
+    
+  ggplot(X, aes(x = steps, y = Xt)) +
+    geom_step() +
+    theme_bw() +
+    labs(x = "Time", y = "In queue [X(t)]") +
+    scale_y_continuous(breaks = seq(0,max(X$Xt) + 2, 2))
+  
+}
+
+plotQueue(20,1,1)
+```
+
+
+#### e) Using a Monte Carlo approach, estimate $P(W_2  \ge  1)$.  Assume $\lambda = 1$, $\mu = 1$.  Compare your estimate to the exact answer you derived in part (a).   Repeat for $P(W_{100} \ge 1)$, except in this case you won't have the exact answer.
+
+
+We can use our `waitingTimes` function created in 2b. Simply run the function $N$ times, then calculate number of times $W_2 \geq 1 / N$ to estimate the probabilty
+
+Let $N = 100000$
+
+```{r }
+set.seed(123)
+N <- 100000
+#cl <- parallel::detectCores()
+cl <- parallel::makeCluster(parallel::detectCores() - 1)
+
+WaitTimes <- t(parallel::parSapply(cl, X = rep(2, N), FUN = waitingTimes, lambda = 1, mu = 1))
+
+P <- mean(WaitTimes[,2] >=1)
+#parallel::stopCluster(cl)
+```
+
+Runing the above, we find that the probabilty the second customer has to wait in line more than $1$ time unit is `r P`
+
+We follow the same process for $W_{100}$, simply expand `n` in `waitingTimes` to 100 instead of 2
+
+```{r }
+set.seed(123)
+N <- 100000
+#cl <- parallel::detectCores()
+#cl <- parallel::makeCluster(parallel::detectCores() - 1)
+
+WaitTimes <- t(parallel::parSapply(cl, X = rep(100, N), FUN = waitingTimes, lambda = 1, mu = 1))
+
+P <- mean(WaitTimes[,100] >=1)
+parallel::stopCluster(cl)
+```
+
+Runing the above, we find that the probabilty the $100^{th}$ customer has to wait in line more than $1$ time unit is `r P`
+
+
+
+
+
+
+
+
