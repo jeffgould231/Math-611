@@ -2,7 +2,7 @@
 title: "Math 611 HW1"
 author: "Jeff Gould"
 date: "8/30/2020"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -16,10 +16,31 @@ Consider the queue model discussed in class (i.e. a single server model).   As i
 
 #### a) Determine $P(W_2 \ge c)$ for $c$ a positive number. (write down an integral and evaluate it, you won't need a computer). 
 
+$P(W_2 \ge c) = P(\max(0,D_1 - A_2) \ge c) = P((T_1 + V_1) - (T_1+T_2) \ge c =$
+
+$P(V_1 - T_1 \ge c) = P(V_1 \ge c + t_1) = \int_0^{\infty}\int_{c + t_1}^{\infty}\mu e^{-\mu v}\lambda e^{-\lambda t}dvdt = \int_0^{\infty}\lambda e^{-\lambda t}\left[-e^{-\mu v}\right]_{c+t_1}^{\infty}dt = \int_0^{\infty}\lambda e^{-\lambda t}e^{-\mu(c+t_1)}dt =$
+
+$e^{-\mu c}\int_0^{\infty}\lambda e^{-\lambda t}e^{-\mu t}dt = \frac{e^{-\mu c}\lambda \left[e^{(-\lambda - \mu)t} \right]_0^{\infty}}{\lambda + \mu} = \frac{\lambda e^{-\mu c}}{\lambda + \mu}$
 
 
 #### b) Write down an integral expression for $P(W_3 \ge c)$ (You don't need to evaluate the integral, unless you want to.  Your answer may be the sum of two integrals.)
 
+$P(W_3 > c) = P(\max(0,\hat{D}_2 - \hat{A_3}) > c) = P(D_2-A_3 > c) = P((A_2 + W_2 + V_2) - (T_0 + T_1 + T_2) > x) =$
+
+$P(W_2 + V_2 - T_2 > c) = P(W_2 > c - V_2 + T_2) = P(\max(0,V_1-T_1) > c - V_2 + T_2)$
+
+
+Two scenarios - either $c - V_2 + T_2 >0$ or $c - V_2 + T_2 < 0$
+
+If $c - V_2 + T_2 >0$, then $P(\max(0,V_1-T_1) > c - V_2 + T_2)$ = $P(V_1-T_1 > c - V_2 + T_2)$, $V_1 > T_1$
+
+If $c - V_2 + T_2 < 0$, then $P(\max(0,V_1-T_1) > c - V_2 + T_2) = 1$
+
+$c - V_2 + T_2 >0 \rightarrow c + T_2 > V_2$. If $c - V_2 + T_2 < 0 \rightarrow V_2 > c + T_2$
+
+Add the two scenarios together:
+
+$P(\max(0,V_1-T_1) > c - V_2 + T_2) = \int_0^{\infty}dT_2\int_0^{\infty}dT_1\int_{T_1}^{\infty} dV_1\int_0^{c+T_2}dV_2\lambda e^{-\lambda t_1}\mu e^{-\mu v_1}\mu e^{-\mu v_2}\lambda e^{-\lambda t_2} +\int_0^{\infty}dT_2\int_0^{\infty}dT_1\int_{T_1}^{\infty} dV_1\int_{c+T_2}^{\infty}dV_2\lambda e^{-\lambda t_1}\mu e^{-\mu v_1}\mu e^{-\mu v_2}\lambda e^{-\lambda t_2}$
 
 #### c) Write a function  WaitingTimes(n $\lambda$, $\mu$) that samples the waiting times of the first $n$ customers.  Your function should return a vector of length $n$ with the sampled waiting time.  Show the output of your function for $n=10, \lambda=1, \mu=1$.
 
@@ -87,28 +108,19 @@ plotQueue <- function(t, lambda, mu){
     D[i] <- A[i] + W[i] + V[i]
   }
   
-  steps <- sort(c(0,A,D))
-  steps <- steps[steps <= t]
-  
-  inqueue <- function(Arrival, Departure, time){
-    return(
-      if(Arrival <= time & time < Departure){1}else{0}
-    )
+  X <- data.frame(
+    steps = c(0,A,D),
+    count = c(0, rep(1, length(A)), rep(-1, length(D)))  ### Add 1 if arrival, subtract 1 if departure
+  ) %>% 
+    arrange(steps) %>% ## Put events in chronological order
+    filter(steps <= t) %>% ### remove departures after t
+    mutate(in_queue = cumsum(count))
     
-  }
-  
-  Xt <- sum(mapply(inqueue, A,D, time = steps[1]))
-  for (j in 2:length(steps)) {
-    Xt[j] = sum(mapply(inqueue, A,D, time = steps[j]))
-  }
-  
-  X <- data.frame(steps, Xt)
-    
-  ggplot(X, aes(x = steps, y = Xt)) +
+  ggplot(X, aes(x = steps, y = in_queue)) +
     geom_step() +
     theme_bw() +
     labs(x = "Time", y = "In queue [X(t)]") +
-    scale_y_continuous(breaks = seq(0,max(X$Xt) + 2, 2))
+    scale_y_continuous(breaks = seq(0,max(X$in_queue) + 2, 2))
   
 }
 
@@ -119,31 +131,29 @@ plotQueue(20,1,1)
 #### e) Using a Monte Carlo approach, estimate $P(W_2  \ge  1)$.  Assume $\lambda = 1$, $\mu = 1$.  Compare your estimate to the exact answer you derived in part (a).   Repeat for $P(W_{100} \ge 1)$, except in this case you won't have the exact answer.
 
 
-We can use our `waitingTimes` function created in 2b. Simply run the function $N$ times, then calculate number of times $W_2 \geq 1 / N$ to estimate the probabilty
+We can use our `waitingTimes` function created in 2a. Simply run the function $N$ times, then calculate number of times $W_2 \geq 1 / N$ to estimate the probabilty
 
 Let $N = 100000$
 
 ```{r }
 set.seed(123)
 N <- 100000
-#cl <- parallel::detectCores()
 cl <- parallel::makeCluster(parallel::detectCores() - 1)
 
 WaitTimes <- t(parallel::parSapply(cl, X = rep(2, N), FUN = waitingTimes, lambda = 1, mu = 1))
 
 P <- mean(WaitTimes[,2] >=1)
-#parallel::stopCluster(cl)
 ```
 
 Runing the above, we find that the probabilty the second customer has to wait in line more than $1$ time unit is `r P`
+
+Compared with our answer from 2b: $\frac{\lambda e^{-\mu c}}{\lambda + \mu} = \frac{1 e^{-1\cdot 1}}{1 + 1} = 0.18394$
 
 We follow the same process for $W_{100}$, simply expand `n` in `waitingTimes` to 100 instead of 2
 
 ```{r }
 set.seed(123)
 N <- 100000
-#cl <- parallel::detectCores()
-#cl <- parallel::makeCluster(parallel::detectCores() - 1)
 
 WaitTimes <- t(parallel::parSapply(cl, X = rep(100, N), FUN = waitingTimes, lambda = 1, mu = 1))
 
@@ -154,9 +164,91 @@ parallel::stopCluster(cl)
 Runing the above, we find that the probabilty the $100^{th}$ customer has to wait in line more than $1$ time unit is `r P`
 
 
+### 3 Let $X$ be a multivariate normal, $X \sim \mathcal{N}(\mu, \Sigma)$.  
+
+#### a) Show that the coordinates of $X$ are independent if and only if $\Sigma$ is diagonal.  (Hint: recall how the joint pdf and marginal pdfs relate for independent r.v.)
+
+"$\Rightarrow$" Suppose the coordinates of $X$ are independent, $x_i \sim N(\mu_i,\sigma_i^2)$. Then $f(x_1,x_2,\dots,x_n) = f(x_1)f(x_2)\dots f(x_n)$
+
+$$f(x_1)f(x_2)\dots f(x_n) = \int\int\dots\int f(x_1)f(x_2)\dots f(x_n) dx_1dx_2\dots dx_n = \int\int\dots\int \prod_{i=1}^n\frac{1}{\sqrt{2\pi}\sigma_i}e^{-\frac{(x_i-\mu_i)^2}{2\sigma_i^2}}dx_i =$$ $$\int\int\dots\int\frac{1}{(2\pi)^{n/2}\prod_{i=1}^n\sqrt{\sigma_i}}e^{-\sum_{i=1}^n\frac{(x_i-\mu_i)^2}{2\sigma_i^2}}dx_1\dots dx_n$$
+This gives us $\prod_{i=1}^n\sqrt{\sigma_i} = \left| \det \Sigma \right|^{1/2}$. Since we already know that each $\Sigma_{ii} = \sigma_i^2$, then the fact that the determinant of $\Sigma$ is the product of it's diagonal entries means $\Sigma$ is at least a triangular matrix, ie the lower half of $\Sigma$ is all 0's. Since $\Sigma$ is also symmetric, this means that $\Sigma$ is diagonal
 
 
+"$\Leftarrow$" Now suppose $\Sigma$ is a diagonal matrix. Then each $\Sigma_{ij} = 0$ $\forall i \neq j$, and $\Sigma_{ii} = \sigma_i^2$
 
+$f(x_1,x_2,\dots,x_n) = \int\int\dots\int\frac{1}{(2\pi)^{n/2}|\det(\Sigma)|^{1/2}}e^{-(\mathbf{x}-\mathbf{\mu})^T\Sigma^{-1}(\mathbf{x}-\mathbf{\mu})/2}dx_1dx_2\dots dx_n$
+
+Then $\det(\Sigma) = \prod \sigma_i$, as $\Sigma$ is diagonal, and $(\mathbf{x}-\mathbf{\mu})^T\Sigma^{-1}(\mathbf{x}-\mathbf{\mu}) = \sum_{i=1}^n (x_i-\mu_i)\sigma_i^{-1}(x_i-\mu_i) = \sum_{i=1}^n(x_i-\mu_i)^2/\sigma_i^2$
+
+So, $\int\int\dots\int\frac{1}{(2\pi)^{n/2}|\det(\Sigma)|^{1/2}}e^{-(\mathbf{x}-\mathbf{\mu})^T\Sigma^{-1}(\mathbf{x}-\mathbf{\mu})/2} = \int\int\dots\int\frac{1}{(2\pi)^{n/2}\prod_{i=1}^n\sigma_i^{1/2}}e^{-\sum_{i=1}^n(x_i-\mu_i)^2/2\sigma_i^2} = \int\int\dots\int \prod_{i=1}^n\frac{1}{\sqrt{2\pi}\sigma_i}e^{-\frac{x_i-\mu_i}{2\sigma_i^2}}dx_1dx_2\dots dx_n =$
+
+$\int\int\dots\int\prod_{i=1}^nf(x_i) = f(x_1)f(x_2)\dots f(x_n)$ therefore the coordinates of $X$ are independent.
+
+#### b) Suppose that $X \in \mathbb{R}^2$ and that $\Sigma$ is diagonal.  Show that the level curves of the pdf are either ellipses or lines. If the level curves are lines, what can you say about $\Sigma$?
+
+$\Sigma = \left(\begin{array}{cc} \sigma_1^2 & 0 \\ 0 & \sigma_2^2 \end{array} \right) \rightarrow \lambda_1 = \sigma_1^2, \lambda_2 = \sigma_2^2, Q = I$
+
+$\mathbf{\mu} = (\mu_1 \,\,\,\, \mu_2)^T$
+
+Let $c \in \mathbb{R}$, then the points $\{(x_1,x_2)\in \mathbb{R}^2:f(x_1,x_2) = c\}$ is the level curve of $X$ at $c$
+
+The ellipse has axes defined by the eigenvectors of $\Sigma$, $q^{(1)},q^{(2)}$ and the length of the axes by the corresponding eigenvalues, $\lambda_1 = \sigma_1^2$ and $\lambda_2 = \sigma_2^2$
+
+Define a level curve at $c$ as $c^2 = (\mathbf{x} - \mathbf{\mu})^T\Sigma^{-1}(\mathbf{x} - \mathbf{\mu})$
+
+If $\sigma_1,\sigma_2 \neq 0$, then $c^2 = (\mathbf{x} - \mathbf{\mu})^T\Sigma^{-1}(\mathbf{x} - \mathbf{\mu}) = \frac{(x_1-\mu_1)^2}{\sigma_1^2} + \frac{(x_2 - \mu_2)^2}{\sigma_2^2}$ is the formula for an ellipse. 
+
+However, if $\sigma_1 = 0$ or $\sigma_2 = 0$, then $\Sigma$ is not an invertible matrix. 
+
+Consider the case when $\sigma_2^2 = 0$. We will sub in $\epsilon$ and take the limit as $\epsilon \to 0$
+
+The length of the axes for $q^{(2)}$ is defined by $\lambda_2$. As $\lim_{\epsilon \to 0 }\lambda_2 \Rightarrow \lambda_2 \to 0$, since $\lambda_2 = \sigma_2$. So there is no width to the $q^{(2)}$ axis, thus we end up with a line on $q^{(1)}$. We can show the opposite for if $\sigma_1^2 = 0$.
+
+#### c) Suppose $Y \sim \mathcal{N}(\mu', \Sigma')$ and that $X$ and $Y$ are independent.  $X + Y$ will also be normal.  Compute the mean and covariance matrix of $X + Y$.  (You will find that the means and covariances sum.  Don't just quote a result, show that this is the case.)  Suppose $X \in \mathbb{R}^n$ and $M$ a $n \times n$ matrix.  Show that $MX \sim \mathcal{N}(M \mu, M \Sigma M^T)$
+
+Let $Z = X+Y$
+
+Then $E[Z] = E[X+Y] = E[X] +E[Y] = \mathbf{\mu} + \mathbf{\mu'}$
+
+Let $\Sigma^*$ be the covariance matrix for $Z$. Then $\Sigma^*_{ij} = E[(x_i+y_i)(x_j+y_j)] - E[x_i+y_i]E[x_j+y_j] =$
+$E[x_ix_j]+E[y_ix_j]+E[x_iy_j]+E[x_ix_j]-E[x_i][x_j] - E[y_i]E[x_j] - E[x_i]E[y_j]-E[y_i]E[z_j] =$
+$(E[x_ix_j]-E[x_i]E[x_j]) + (E[y_iy_j] -E[y_i]E[y_j]) + (E[y_ix_j] - E[y_i]E[x_j])+(E[x_iy_j]-E[x_i]E[y_j])$
+
+Since $X$ and $Y$ are independent, $E[x_iy_j] = E[x_i]E[y_j]$ and $E[x_jy_i] = E[x_j]E[y_i]$. So the last equation becomes:
+$E[(x_i+y_i)(x_j+z_j)] - E[x_i + y_i]E[x_j + y_j] = (E[x_ix_j] - E[x_i]E[x_j])+ (E[y_jy_j]-E[y_i]E[y_j]) = \Sigma_{ij} + \Sigma_{ij}' \rightarrow var(Z) = \Sigma + \Sigma'$
+
+Thus, combined with the property that the sum of normal r.v.'s is also a normal r.v.,  $Z = X+Y \sim \mathcal{N}(\mu + \mu', \Sigma+\Sigma'$
+
+
+* Suppose $X \in \mathbb{R}^n$ and $M$ a $n \times n$ matrix.  Show that $MX \sim \mathcal{N}(M \mu, M \Sigma M^T)$
+
+Define $Y$ as the random variable generated by $MX$. 
+$E[Y] = E[MX] = E[M]E[X] = ME[X] = M\mathbf{\mu}$
+
+$Var[Y] = E[(y-\bar{y})(y-\bar{y})^T] = E[(Mx - M\mu)(Mx - M\mu)^T] = E[(M(x-\mu)(M(x-\mu))^T] =$
+$E[M(x - \mu)(x - \mu)^TM^T] = ME[(x - \mu)(x - \mu)^T]M^T = M\Sigma M^T$
+
+$Var(Y) = Var(MX) = M\Sigma M^T$
+
+$Y = MX \sim \mathcal{N}(M\mu, M\Sigma M^T)$
+
+
+$\\$
+$\\$
+$\\$
+
+
+(another way to look at 3c.1?)
+
+$f_Z(z) = \int\dots\int f_Y(z-x)f_X(x)dx_1\dots dx_n =\\$
+$\int \dots \int \frac{1}{\sqrt{2\pi}^n\det\Sigma '^{1/2}}\exp\left[-(z - x - \mu')^T\Sigma '^{-1}(z - x- \mu')/2\right]\frac{1}{\sqrt{2\pi}^n\det\Sigma ^{1/2}}\exp\left[-(x - \mu)^T\Sigma^{-1}(x- \mu)/2\right] =\\$
+$\int \dots \int \frac{1}{\sqrt{2\pi}^n\det\Sigma '^{1/2}}\frac{1}{\sqrt{2\pi}^n\det\Sigma^{1/2}}\exp\left[-((z - x - \mu')^T\Sigma '^{-1}(z - x- \mu') + -(x - \mu)^T\Sigma^{-1}(x- \mu))/2\right]$
+
+$(-(z - x - \mu')^T\Sigma '^{-1}(z - x- \mu') + -(x - \mu)^T\Sigma^{-1}(x- \mu))=\\$ 
+$-(z - x- \mu')\cdot \Sigma '^{-1}(z - x- \mu') + -(x - \mu) \cdot \Sigma^{-1}(x- \mu) =\\$
+$(-z + x + \mu' - x + \mu) \cdot(\Sigma '^{-1}(z - x- \mu') +\Sigma^{-1}(x- \mu)) = -(z-(\mu' + \mu)) \cdot(\Sigma +\Sigma')^{-1}(z-(\mu' + \mu))$
+
+$\frac{1}{\sqrt{2\pi}^n\det\Sigma '^{1/2}}\frac{1}{\sqrt{2\pi}^n\det\Sigma^{1/2}} = \frac{1}{\sqrt{2^n\pi^n \det\Sigma'\det\Sigma}}$
 
 
 
