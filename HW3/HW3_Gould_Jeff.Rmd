@@ -1,0 +1,327 @@
+---
+title: "Math 611 HW3"
+author: "Jeff Gould"
+date: "9/16/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+library(ggplot2)
+```
+
+
+### 1 Hope College
+
+Attached is a file containing the heights of men and women at Hope College, see file for details.  Consider the two component Gaussian mixture model,
+\begin{equation}
+X = \bigg\{
+\begin{array}{cc}
+\mathcal{N}(\mu_1, \sigma_1^2) & \text{ with probability } p_1 \\
+\mathcal{N}(\mu_2, \sigma_2^2) & \text{ with probability } 1 - p_1 
+\end{array}
+\end{equation}
+where $\mathcal{N}(\mu, \sigma^2)$ is the normal distribution and $X$ models the height of a person when gender is unknown.  Let $\theta = (\mu_1, \mu_2, \sigma_1^2, \sigma_2^2, p_1)$.  
+
+#### a) The data file specifies gender, but pretend you don't have this information.   Write down the log-likelihood function $\ell(\theta)$ and $\nabla \ell(\theta)$ given the height samples, i.e. in terms of $\hat{X}_i$.   Write R (or Python) functions that calculate $\ell(\theta)$ and $\nabla \ell(\theta)$
+
+$$L(\theta) = \prod_{i=1}^N P(\hat{X}_i|\theta) \Rightarrow \log L(\theta) = \ell(\theta)= \sum_{i=1}^N\left[\log \left(p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}\right)\right]$$
+
+
+$$\frac{\partial \ell}{\partial p_1} = \sum_{i=1}^N\left( \frac{\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} - \frac{1}{\sqrt{2\pi\sigma_{2}^2}}e^{-(\hat{X}_i - \mu_2)^2/(2\sigma_2^2)}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
+
+
+$$\frac{\partial \ell}{\partial \mu_1} = \sum_{i=1}^N \left( \frac{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} \cdot \frac{\hat{X}_i - \mu_1}{\sigma_1^2}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
+
+$$\frac{\partial \ell}{\partial \mu_2} = \sum_{i=1}^N \left( \frac{(1 - p_1)\frac{1}{\sqrt{2\pi\sigma_{2}^2}}e^{-(\hat{X}_i - \mu_2)^2/(2\sigma_2^2)} \cdot \frac{\hat{X}_i - \mu_2}{\sigma_2^2}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
+
+$$\frac{\partial \ell}{\partial \sigma_1} = \sum_{i=1}^N \left( \frac{ -(p_1e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)})\cdot (2\pi\sigma_1^2)^{-3/2} + p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} \cdot\frac{(\hat{X} - \mu_1)^2}{2(\sigma_1^2)^2}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
+
+$$\frac{\partial \ell}{\partial \sigma_2} = \sum_{i=1}^N \left( \frac{ -((1-p_1)e^{-(\hat{X}_i - \mu_2)^2/(2\sigma_2^2)})\cdot (2\pi\sigma_2^2)^{-3/2} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i - \mu_2)^2/(2\sigma_2^2)} \cdot\frac{(\hat{X} - \mu_2)^2}{2(\sigma_2^2)^2}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
+
+$$\nabla \ell = \left( \begin{array}{c}\frac{\partial \ell}{\partial \mu_1} \\ \frac{\partial \ell}{\partial \mu_2} \\ \frac{\partial \ell}{\partial \sigma_1} \\  \frac{\partial \ell}{\partial \sigma_2} \\ \frac{\partial \ell}{\partial p_1} \end{array}  \right)$$
+
+#### b) Find the MLE for $\theta$ by:
+
+* Applying a steepest ascent iteration $\theta^{(i+1)} = \theta^{(i)} + s \nabla \ell(\theta)$.   
+* Using `nlm` or an equivalent in Python
+
+
+```{r }
+
+hopeHeights <- read.table("Hope Heights.txt", header = TRUE)
+
+logL <- function(theta, X){
+  
+  mu_1 <- theta[1]
+  mu_2 <- theta[2]
+  sigma_1 <- theta[3]
+  sigma_2 <- theta[4]
+  p_1 <- max(theta[5], 0) ### constraint in case the step pushed p into negative values
+  p_1 <- min(1, p_1) ### constraint in case the step pushes p greater than 1
+  
+  logLoss <- sum(
+    log(
+      p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) + (1 - p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2))
+    )
+  )
+  return(logLoss)
+  
+}
+
+gradLogL <- function(theta, X){
+  
+  mu_1 <- theta[1]
+  mu_2 <- theta[2]
+  sigma_1 <- theta[3]
+  sigma_2 <- theta[4]
+  p_1 <- theta[5]
+  
+  denominator <- p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) + (1 - p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2))
+  
+  d_mu_1 <- sum(
+    (p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) *(X - mu_1) / sigma_1) / denominator
+    )
+  
+  d_mu_2 <- sum(
+    ((1 - p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) * (X - mu_2) / sigma_2) / denominator
+  )
+  
+  d_sigma_1 <- sum(
+    (-(p_1 * exp(-(X - mu_1)^2 / (2 * sigma_1))) * (2 * pi * sigma_1)^(-3/2) +
+       p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) * (X - mu_1)^2 / (2 * sigma_1^2)) / 
+      denominator
+  )
+  
+    d_sigma_2 <- sum(
+    (-((1-p_1) * exp(-(X - mu_2)^2 / (2 * sigma_2))) * (2 * pi * sigma_2)^(-3/2) +
+       (1-p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) * (X - mu_2)^2 / (2 * sigma_2^2)) / 
+      denominator
+  )
+    
+   d_p_1 <- sum(
+     (dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) - dnorm(X, mean = mu_2, sd = sqrt(sigma_2))) / denominator
+   ) 
+   
+   gradient <- c(d_mu_1, d_mu_2, d_sigma_1, d_sigma_2, d_p_1)
+   return(gradient)
+}
+
+
+norm <- function(x){
+  sqrt(sum(x^2))
+}
+
+
+steepest_ascent <- function(start_theta,
+                            X = hopeHeights$Height,
+                            step = 0.1,
+                            epsilon = 1e-3,
+                            max_iter = 1e6){
+  
+  theta <- start_theta
+  iter <- 0
+  
+  current_grad <- gradLogL(theta = theta, X = X)
+  loss_history <- c()
+  while(norm(current_grad) > epsilon & iter < max_iter){
+    iter <- iter + 1
+    
+    d <- current_grad / norm(current_grad)
+    s <- step
+    currentLogL <- logL(theta = theta, X = X)
+    loss_history <- c(loss_history, currentLogL)
+    while(logL(theta = (theta + s*d), X = X) < currentLogL){
+      s <- s/2
+    }
+    
+    theta <- theta + s * d
+    current_grad <- gradLogL(theta = theta, X = X)
+    if(iter %% 10000 == 0){print(iter)}
+  }
+  
+  return(list(theta=theta, iter=iter, gradient=current_grad, loss_history = loss_history))
+
+}
+
+set.seed(123)
+tictoc::tic()
+test <- steepest_ascent(c(runif(2, 55, 85),
+                          10,
+                          6,
+                          0.7), max_iter = 1000)
+tictoc::toc()
+
+nlm(f = logL, p = 5, X = hopeHeights$Height)
+
+```
+
+
+#### c) Given your MLE in (b), use the distribution of $X$ to predict whether a given sample is taken from a man or woman.   Intuitively, the two normal distributions of $X$ correspond to the male and female height distributions.  Given a sample, $\hat{X}$, decide which normal the sample is most likely to come from and assign the gender accordingly.  Determine what percentage of individuals are classified correctly. 
+
+
+
+
+
+
+
+
+
+
+
+
+### 2 Chutes & Ladders (Again)
+
+#### a) Compute the probabilty of winning in $n$ steps for $n = 1,2,\dots,50$. Compute exactly, do not use Monte Carlo.
+
+The probabilty of ending the game at step $n$ is $P(t_n = 100 | t_o = 0)$. For our $101 \times 101$ probability matrix (100 spaces and starting off the board) $\underline{P}$, the probabilty at turn $n$ of the game being over is $\underline{P}_{1,101}^n$
+
+```{r }
+
+P <- t(sapply(X = c(0:100), FUN = function(x){
+  if(x == 0){
+    return(c(0, rep(1/6, 6), rep(0, 94)))
+  }else if(x <= 94){
+    return(c(rep(0, x+1), rep(1/6, 6), rep(0, 100 - x - 6)))
+  }else if(x < 100){
+    return(c(rep(0,x+1), rep(1/6, 100-x-1), (6 - (100-x-1)) / 6))
+  } else{
+    return(c(rep(0,100), 1))
+  }
+}))
+
+chutes_ladders <- readr::read_csv(file = "~/Desktop/Math-611/HW 2/chutes_and_ladder_locations.csv")
+
+
+for (i in 1:nrow(chutes_ladders)) {
+  location <- chutes_ladders$start[i]
+  new_end <- chutes_ladders$end[i]
+  
+  P_events <- which(P[,location + 1] != 0)
+  probs <- P[P_events, location + 1]
+  
+  P[P_events, new_end + 1] <- probs + P[P_events, new_end + 1]
+  P[P_events, location + 1] <- 0
+  
+}
+
+require(expm)
+win_probs <- sapply(1:50, function(x){
+  P_n = (P %^% x)
+  return(P_n[1, 101])
+})
+Chutes_cdf <- data.frame(
+  n = c(1:50),
+  win_prob = win_probs
+)
+
+ggplot(data = Chutes_cdf, aes(x = n, y = win_probs)) +
+  geom_line() +
+  theme_bw()
+
+
+```
+
+
+#### b) What's the probabilty of the game lasting more than 1,000 moves?
+
+To solve this, simply take $1 - \underline{P}^{1000}_{1,101}$
+
+```{r }
+
+P_trans <- P %^% 1000
+
+1 - P_trans[1,101]
+
+```
+
+
+#### c) Suppose we modify Chutes and Ladders so that the player wraps back to square 1 once they go beyond 100. So for example, if the players in on square 99 and rolse a 3, they end up on square 2.
+
+```{r }
+P <- t(sapply(X = c(0:100), FUN = function(x){
+  if(x == 0){
+    return(c(0, rep(1/6, 6), rep(0, 94)))
+  }else if(x <= 94){
+    return(c(rep(0, x+1), rep(1/6, 6), rep(0, 100 - x - 6)))
+  }else if(x <= 100){
+    return(c(0, rep(1/6, (x + 6)%%100), rep(0, 94), rep(1/6, 100-x)))
+  } else{
+    return(c(rep(0,100), 1))
+  }
+}))
+
+for (i in 1:nrow(chutes_ladders)) {
+  location <- chutes_ladders$start[i]
+  new_end <- chutes_ladders$end[i]
+  
+  P_events <- which(P[,location + 1] != 0)
+  probs <- P[P_events, location + 1]
+  
+  P[P_events, new_end + 1] <- probs + P[P_events, new_end + 1]
+  P[P_events, location + 1] <- 0
+  
+}
+
+```
+
+##### i) Compute the stationary distribution. After 1 billion moves, on what square is a player's piece most likely to be on?
+
+The stationary distribution $\pi$ for a transtion probabilty matrix $\underline{P}$ is simply a row vector of $\lim_{n\to \infty} \underline{P}^n$
+
+```{r }
+stationaryP <- P %^% 1e9
+
+Pi <- stationaryP[1,2:101]
+
+which.max(Pi)
+Pi[which.max(Pi)]
+```
+
+We see that after 1 billion turns, the player is most likely to be on square 44, with $P=0.0303$
+
+
+
+
+##### ii) Compute the relaxation time and explain why it makes sense in terms of your results for the expectd time of a game in the previous HW.
+
+
+
+
+
+##### iii) Now suppose that we play the game as follows. Each round, with probaility $p$, the player doesn't move. With probability $1-p$ the player rolls the die and moves as usual. For $p = .9, .99, .999$, compute the relaxation times
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$\left(p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}\right) = \frac{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}}{\sqrt{2\pi\sigma_1^2\sigma_2^2}} + \frac{(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}{\sqrt{2\pi\sigma_1^2\sigma_2^2}} \Rightarrow$
+
+$$\log\left[\frac{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}{\sqrt{2\pi\sigma_1^2\sigma_2^2}} \right] = \\ \log\left[p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2} \right] - \frac{1}{2}\log\left[2\pi\sigma_1^2\sigma_2^2\right]$$
+
+$$ \sum_{i=1}^N\left[\log \left(p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}\right)\right] = \sum_{i=1}^N \left(log\left[p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2} \right]\right) - \frac{N}{2}\log\left[2\pi\sigma_1^2\sigma_2^2\right]$$
+
+$$\frac{\partial\ell}{\partial p_1} = \sum_{i=1}^N \frac{\left( e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2} -e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}\right)}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}$$
+
+$$\frac{\partial \ell}{\partial \mu_1} = \sum_{i=1}^N \frac{p_1\sqrt{\sigma_2^2}e^{-(\hat{X}-\mu_1)^2/2\sigma_1^2}\cdot \frac{\hat{X} - \mu_1}{2}}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}$$
+
+$$\frac{\partial \ell}{\partial \mu_2} = \sum_{i=1}^N \frac{(1-p_1)\sqrt{\sigma_1^2}e^{-(\hat{X}-\mu_2)^2/2\sigma_2^2}\cdot \frac{\hat{X} - \mu_2}{2}}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}$$
+
+$$\frac{\partial \ell}{\partial \sigma_1^2} = \sum_{i=1}^N \left(\frac{p_1\sqrt{\sigma_2^2}e^{-(\hat{X}-\mu_1)^2/2\sigma_1^2} \cdot \frac{(x-\mu_1)^2}{2(\sigma_1^2)^2} + \frac{1-p_1}{2\sqrt{\sigma_1^2}}e^{-(\hat{X} - \mu_2)^2/2\sigma_2^2}}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}} \right)- \frac{N}{2\sigma_1^2}$$
+
+$$\frac{\partial \ell}{\partial \sigma_1^2} = \sum_{i=1}^N \left( \frac{(1-p_1)\sqrt{\sigma_1^2}e^{-(\hat{X}-\mu_2)^2/2\sigma_2^2} \cdot \frac{(x-\mu_2)^2}{2(\sigma_2^2)^2} + \frac{p_1}{2\sqrt{\sigma_2^2}}e^{-(\hat{X} - \mu_1)^2/2\sigma_1^2}}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}} \right) - \frac{N}{2\sigma_2^2}$$
+
+
+
+
+
+
