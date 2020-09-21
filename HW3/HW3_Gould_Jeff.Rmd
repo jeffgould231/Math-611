@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 library(ggplot2)
+library(tidyverse)
 ```
 
 
@@ -35,9 +36,9 @@ $$\frac{\partial \ell}{\partial \mu_1} = \sum_{i=1}^N \left( \frac{p_1\frac{1}{\
 
 $$\frac{\partial \ell}{\partial \mu_2} = \sum_{i=1}^N \left( \frac{(1 - p_1)\frac{1}{\sqrt{2\pi\sigma_{2}^2}}e^{-(\hat{X}_i - \mu_2)^2/(2\sigma_2^2)} \cdot \frac{\hat{X}_i - \mu_2}{\sigma_2^2}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
 
-$$\frac{\partial \ell}{\partial \sigma_1} = \sum_{i=1}^N \left( \frac{ -(p_1e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)})\cdot (2\pi\sigma_1^2)^{-3/2} + p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} \cdot\frac{(\hat{X} - \mu_1)^2}{2(\sigma_1^2)^2}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
+$$\frac{\partial \ell}{\partial \sigma_1^2} = \sum_{i=1}^N \left( \frac{ -(p_1e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)})\cdot \frac{1}{2 \sigma_1^2\sqrt{2 \pi \sigma_1^2}} + p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} \cdot\frac{(\hat{X} - \mu_1)^2}{2(\sigma_1^2)^2}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
 
-$$\frac{\partial \ell}{\partial \sigma_2} = \sum_{i=1}^N \left( \frac{ -((1-p_1)e^{-(\hat{X}_i - \mu_2)^2/(2\sigma_2^2)})\cdot (2\pi\sigma_2^2)^{-3/2} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i - \mu_2)^2/(2\sigma_2^2)} \cdot\frac{(\hat{X} - \mu_2)^2}{2(\sigma_2^2)^2}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
+$$\frac{\partial \ell}{\partial \sigma_2^2} = \sum_{i=1}^N \left( \frac{ -((1-p_1)e^{-(\hat{X}_i - \mu_2)^2/(2\sigma_2^2)})\cdot \frac{1}{2\sigma_2^2\sqrt{2\pi \sigma_2^2}} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i - \mu_2)^2/(2\sigma_2^2)} \cdot\frac{(\hat{X} - \mu_2)^2}{2(\sigma_2^2)^2}}{p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}} \right)$$
 
 $$\nabla \ell = \left( \begin{array}{c}\frac{\partial \ell}{\partial \mu_1} \\ \frac{\partial \ell}{\partial \mu_2} \\ \frac{\partial \ell}{\partial \sigma_1} \\  \frac{\partial \ell}{\partial \sigma_2} \\ \frac{\partial \ell}{\partial p_1} \end{array}  \right)$$
 
@@ -68,6 +69,44 @@ logL <- function(theta, X){
   return(logLoss)
   
 }
+
+# gradLogL <- function(theta, X){
+#   
+#   mu_1 <- theta[1]
+#   mu_2 <- theta[2]
+#   sigma_1 <- theta[3]
+#   sigma_2 <- theta[4]
+#   p_1 <- theta[5]
+#   
+#   denominator <- p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) + (1 - p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2))
+#   
+#   d_mu_1 <- sum(
+#     (p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) *((X - mu_1) / sigma_1)) / denominator
+#     )
+#   
+#   d_mu_2 <- sum(
+#     ((1 - p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) * ((X - mu_2) / sigma_2)) / denominator
+#   )
+#   
+#   d_sigma_1 <- sum(
+#     (-(p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) / (2 * sigma_1)) +
+#        p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) * ((X - mu_1)^2 / (2 * sigma_1^2))) / 
+#       denominator
+#   )
+#   
+#     d_sigma_2 <- sum(
+#     (-((1-p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) / (2 * sigma_2)) +
+#        (1-p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) * ((X - mu_2)^2 / (2 * sigma_2^2))) / 
+#       denominator
+#   )
+#     
+#    d_p_1 <- sum(
+#      (dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) - dnorm(X, mean = mu_2, sd = sqrt(sigma_2))) / denominator
+#    ) 
+#    
+#    gradient <- c(d_mu_1, d_mu_2, d_sigma_1, d_sigma_2, d_p_1)
+#    return(gradient)
+# }
 
 gradLogL <- function(theta, X){
   
@@ -107,7 +146,6 @@ gradLogL <- function(theta, X){
    return(gradient)
 }
 
-
 norm <- function(x){
   sqrt(sum(x^2))
 }
@@ -115,7 +153,7 @@ norm <- function(x){
 
 steepest_ascent <- function(start_theta,
                             X = hopeHeights$Height,
-                            step = 0.1,
+                            step = 0.05,
                             epsilon = 1e-3,
                             max_iter = 1e6){
   
@@ -149,9 +187,9 @@ tictoc::tic()
 test <- steepest_ascent(c(runif(2, 55, 85),
                           10,
                           6,
-                          0.7), max_iter = 1000)
+                          0.5), max_iter = 100000)
 tictoc::toc()
-
+plot(test$loss_history)
 nlm(f = logL, p = 5, X = hopeHeights$Height)
 
 ```
@@ -160,12 +198,27 @@ nlm(f = logL, p = 5, X = hopeHeights$Height)
 #### c) Given your MLE in (b), use the distribution of $X$ to predict whether a given sample is taken from a man or woman.   Intuitively, the two normal distributions of $X$ correspond to the male and female height distributions.  Given a sample, $\hat{X}$, decide which normal the sample is most likely to come from and assign the gender accordingly.  Determine what percentage of individuals are classified correctly. 
 
 
+```{r }
+theta <- test[["theta"]]
 
+  mu_1 <- theta[1]
+  mu_2 <- theta[2]
+  sigma_1 <- theta[3]
+  sigma_2 <- theta[4]
+  p_1 <- theta[5]
 
+X_hat <- hopeHeights %>%
+  mutate(p_female = p_1 *dnorm(Height, mu_1, sqrt(sigma_1)) / ( p_1 *dnorm(Height, mu_1, sqrt(sigma_1)) +  (1-p_1) *dnorm(Height, mu_2, sqrt(sigma_2))),
+         p_male = (1-p_1) *dnorm(Height, mu_2, sqrt(sigma_2)) / ( p_1 *dnorm(Height, mu_1, sqrt(sigma_1)) +  (1-p_1) *dnorm(Height, mu_2, sqrt(sigma_2)))) %>%
+  mutate(gender_guess = ifelse(p_female > p_male, 1, 2)) %>%
+  mutate(correct = ifelse(gender_guess == Gender, T, F))
 
+mean(X_hat$correct)
 
-
-
+ggplot(X_hat, aes(x = correct, y = Height)) +
+  geom_point(aes(color = as.factor(Gender))) +
+  theme_bw()
+```
 
 
 
@@ -283,19 +336,70 @@ We see that after 1 billion turns, the player is most likely to be on square 44,
 
 
 
-##### ii) Compute the relaxation time and explain why it makes sense in terms of your results for the expectd time of a game in the previous HW.
+##### ii) Compute the relaxation time and explain why it makes sense in terms of your results for the expected time of a game in the previous HW.
 
+relaxation time = $\frac{1}{1-|\lambda_2|}$
 
+```{r}
+eigP <- eigen(P)
+#head(Re(eigP$values))
 
+1 / (1 - abs(Re(eigP$values[2])))
 
+```
+
+The relaxation time is indicative of how long it takes to converge to the stationary distribution, so every 5.59 turns the time remaining to converge decreases by a factor of $1/e \approx 0.368$
 
 ##### iii) Now suppose that we play the game as follows. Each round, with probaility $p$, the player doesn't move. With probability $1-p$ the player rolls the die and moves as usual. For $p = .9, .99, .999$, compute the relaxation times
 
 
+```{r }
+
+modifiedP <- function(p){
+  P <- t(sapply(X = c(0:100), FUN = function(x){
+  if(x == 0){
+    return(c(0, rep((1-p)/6, 6), rep(0, 94)))
+  }else if(x <= 94){
+    return(c(rep(0, x+1), rep((1-p)/6, 6), rep(0, 100 - x - 6)))
+  }else if(x <= 100){
+    return(c(0, rep((1-p)/6, (x + 6)%%100), rep(0, 94), rep((1-p)/6, 100-x)))
+  } else{
+    return(c(rep(0,100), 1))
+  }
+}))
+  
+  for (i in 1:nrow(chutes_ladders)) {
+    location <- chutes_ladders$start[i]
+    new_end <- chutes_ladders$end[i]
+
+    P_events <- which(P[,location + 1] != 0)
+    probs <- P[P_events, location + 1]
+
+    P[P_events, new_end + 1] <- probs + P[P_events, new_end + 1]
+    P[P_events, location + 1] <- 0
+
+  }
+  P <- P + diag(p, nrow = 101, ncol = 101)
+  return(P)
+}
+
+P.9 <- modifiedP(0.9)
+P.99 <- modifiedP(0.99)
+P.999 <- modifiedP(0.999)
+
+relaxationTime <- function(X){
+  eigX <- eigen(X)
+  return(1 / (1 - abs(Re(eigX$values[2]))))
+}
+
+relaxationTime(P.9)
+relaxationTime(P.99)
+relaxationTime(P.999)
+
+```
 
 
-
-
+As $p$ increases, and we have less movement with each turn, the relaxation time increases, approximately by a factor of 10 with each example given. This indicates that it takes longer to converge to the stationary distribution, which makes sense as there are a lot more turns without any movement.
 
 
 
