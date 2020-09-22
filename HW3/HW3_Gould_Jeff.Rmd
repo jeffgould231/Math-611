@@ -2,7 +2,7 @@
 title: "Math 611 HW3"
 author: "Jeff Gould"
 date: "9/16/2020"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -70,81 +70,72 @@ logL <- function(theta, X){
   
 }
 
-# gradLogL <- function(theta, X){
-#   
-#   mu_1 <- theta[1]
-#   mu_2 <- theta[2]
-#   sigma_1 <- theta[3]
-#   sigma_2 <- theta[4]
-#   p_1 <- theta[5]
-#   
-#   denominator <- p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) + (1 - p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2))
-#   
-#   d_mu_1 <- sum(
-#     (p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) *((X - mu_1) / sigma_1)) / denominator
-#     )
-#   
-#   d_mu_2 <- sum(
-#     ((1 - p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) * ((X - mu_2) / sigma_2)) / denominator
-#   )
-#   
-#   d_sigma_1 <- sum(
-#     (-(p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) / (2 * sigma_1)) +
-#        p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) * ((X - mu_1)^2 / (2 * sigma_1^2))) / 
-#       denominator
-#   )
-#   
-#     d_sigma_2 <- sum(
-#     (-((1-p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) / (2 * sigma_2)) +
-#        (1-p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) * ((X - mu_2)^2 / (2 * sigma_2^2))) / 
-#       denominator
-#   )
-#     
-#    d_p_1 <- sum(
-#      (dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) - dnorm(X, mean = mu_2, sd = sqrt(sigma_2))) / denominator
-#    ) 
-#    
-#    gradient <- c(d_mu_1, d_mu_2, d_sigma_1, d_sigma_2, d_p_1)
-#    return(gradient)
-# }
 
-gradLogL <- function(theta, X){
+grad_logL <- function(theta, X){
   
   mu_1 <- theta[1]
   mu_2 <- theta[2]
   sigma_1 <- theta[3]
   sigma_2 <- theta[4]
   p_1 <- theta[5]
+  p_2 <- 1 - p_1
   
-  denominator <- p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) + (1 - p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2))
+  N1 <- dnorm(X, mean = mu_1, sd = sqrt(sigma_1))
+  N2 <- dnorm(X, mean = mu_2, sd = sqrt(sigma_2))
   
-  d_mu_1 <- sum(
-    (p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) *(X - mu_1) / sigma_1) / denominator
-    )
+  denominator <- p_1 * N1 + p_2 * N2
   
-  d_mu_2 <- sum(
-    ((1 - p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) * (X - mu_2) / sigma_2) / denominator
-  )
-  
-  d_sigma_1 <- sum(
-    (-(p_1 * exp(-(X - mu_1)^2 / (2 * sigma_1))) * (2 * pi * sigma_1)^(-3/2) +
-       p_1 * dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) * (X - mu_1)^2 / (2 * sigma_1^2)) / 
-      denominator
-  )
-  
-    d_sigma_2 <- sum(
-    (-((1-p_1) * exp(-(X - mu_2)^2 / (2 * sigma_2))) * (2 * pi * sigma_2)^(-3/2) +
-       (1-p_1) * dnorm(X, mean = mu_2, sd = sqrt(sigma_2)) * (X - mu_2)^2 / (2 * sigma_2^2)) / 
-      denominator
-  )
+  d_mu_1 <- (p_1 * N1 *(X - mu_1) / sigma_1) / denominator
     
-   d_p_1 <- sum(
-     (dnorm(X, mean = mu_1, sd = sqrt(sigma_1)) - dnorm(X, mean = mu_2, sd = sqrt(sigma_2))) / denominator
-   ) 
+  
+  d_mu_2 <- (p_2 * N2 *(X - mu_2) / sigma_2) / denominator
+    
+  
+  d_sigma_1 <- -(p_1 * (sigma_1 - (X - mu_1)^2)) / (2 * sigma_1^2) * N1 / denominator
+
+  
+  d_sigma_2 <- -(p_2 * (sigma_2 - (X - mu_2)^2)) / (2 * sigma_2^2) * N2 / denominator
+    
+  d_p_1 <- (N1 - N2) / denominator
+
    
-   gradient <- c(d_mu_1, d_mu_2, d_sigma_1, d_sigma_2, d_p_1)
+   grad_samples = matrix(c(d_mu_1,
+                           d_mu_2,
+                           d_sigma_1,
+                           d_sigma_2,
+                           d_p_1),
+                         nrow = length(X),
+                         ncol = length(theta))
+   gradient <- colSums(grad_samples)
    return(gradient)
 }
+
+
+grad_logL <- function(X, theta)
+{
+  mu1 <- theta["mu1"]
+  mu2 <- theta["mu2"]
+  s1 <- theta["s1"]
+  s2 <- theta["s2"]
+  p1 <- theta["p1"]
+  p2 <- 1-p1
+
+  N1 <- dnorm(X, mean=mu1, sd=sqrt(s1))
+  N2 <- dnorm(X, mean=mu2, sd=sqrt(s2))
+  D <- p1 * N1 + p2 * N2
+
+  grad_samples <- matrix(1/D * c(mu1 = p1 * (X - mu1)/ s1 * N1,
+                                 mu2 = p2 * (X - mu2)/ s2 * N2,
+                                 s1= p1 * (-1 / s1 + (X - mu1)^2 / (s1^(3/2)))*N1,
+                                 s2= p2 * (-1 / s2 + (X - mu2)^2 / (s2^(3/2)))*N2,
+                                 p1= N1 - N2),
+                               nrow = length(X),
+                               ncol = length(theta))
+
+  grad <- grad_samples %>% colSums %>% setNames(c("mu1", "mu2", "s1", "s2", "p1"))
+  return (grad_samples %>% colSums)
+}
+
 
 norm <- function(x){
   sqrt(sum(x^2))
@@ -153,14 +144,14 @@ norm <- function(x){
 
 steepest_ascent <- function(start_theta,
                             X = hopeHeights$Height,
-                            step = 0.05,
+                            step = 0.01,
                             epsilon = 1e-3,
                             max_iter = 1e6){
   
-  theta <- start_theta
+  theta <- start_theta %>% setNames(c("mu1", "mu2", "s1", "s2", "p1"))
   iter <- 0
   
-  current_grad <- gradLogL(theta = theta, X = X)
+  current_grad <- grad_logL(theta = theta, X = X)
   loss_history <- c()
   while(norm(current_grad) > epsilon & iter < max_iter){
     iter <- iter + 1
@@ -169,12 +160,15 @@ steepest_ascent <- function(start_theta,
     s <- step
     currentLogL <- logL(theta = theta, X = X)
     loss_history <- c(loss_history, currentLogL)
+    
     while(logL(theta = (theta + s*d), X = X) < currentLogL){
       s <- s/2
     }
     
     theta <- theta + s * d
-    current_grad <- gradLogL(theta = theta, X = X)
+    theta[5] <- max(theta[5], 0)
+    theta[5] <- min(theta[5], 1)
+    current_grad <- grad_logL(theta = theta, X = X)
     if(iter %% 10000 == 0){print(iter)}
   }
   
@@ -182,17 +176,34 @@ steepest_ascent <- function(start_theta,
 
 }
 
-set.seed(123)
+set.seed(1)
 tictoc::tic()
-test <- steepest_ascent(c(runif(2, 55, 85),
+test <- steepest_ascent(c(runif(2, 60, 85),
                           10,
                           6,
                           0.5), max_iter = 100000)
 tictoc::toc()
-plot(test$loss_history)
+test[["theta"]]
 nlm(f = logL, p = 5, X = hopeHeights$Height)
 
 ```
+
+
+We get a $\theta = (66.41, 70.59, 12.56, 12.87, 0.289)^T$. We did decent in converging to the means, but for some reason have been unable to converge to the correct variances or $p_1$
+
+$\mu_1$ = `r mean(hopeHeights$Height[1:50])`
+
+$\mu_2$ = `r mean(hopeHeights$Height[51:100])`
+
+$\sigma_1^2$ = `r sd(hopeHeights$Height[1:50])^2`
+
+$\sigma_2^2$ = `r sd(hopeHeights$Height[51:100])^2`
+
+$\mu_1$ = `r mean(hopeHeights$Gender == 1)`
+
+So we did pretty well with the means, but not great with the $\sigma$'s or $p_1$
+
+`nlm` does not work with our data set due to the boundary conditions of $p$
 
 
 #### c) Given your MLE in (b), use the distribution of $X$ to predict whether a given sample is taken from a man or woman.   Intuitively, the two normal distributions of $X$ correspond to the male and female height distributions.  Given a sample, $\hat{X}$, decide which normal the sample is most likely to come from and assign the gender accordingly.  Determine what percentage of individuals are classified correctly. 
@@ -201,15 +212,21 @@ nlm(f = logL, p = 5, X = hopeHeights$Height)
 ```{r }
 theta <- test[["theta"]]
 
-  mu_1 <- theta[1]
-  mu_2 <- theta[2]
-  sigma_1 <- theta[3]
-  sigma_2 <- theta[4]
-  p_1 <- theta[5]
+mu_1 <- theta[1]
+mu_2 <- theta[2]
+sigma_1 <- theta[3]
+sigma_2 <- theta[4]
+p_1 <- theta[5]
 
 X_hat <- hopeHeights %>%
-  mutate(p_female = p_1 *dnorm(Height, mu_1, sqrt(sigma_1)) / ( p_1 *dnorm(Height, mu_1, sqrt(sigma_1)) +  (1-p_1) *dnorm(Height, mu_2, sqrt(sigma_2))),
-         p_male = (1-p_1) *dnorm(Height, mu_2, sqrt(sigma_2)) / ( p_1 *dnorm(Height, mu_1, sqrt(sigma_1)) +  (1-p_1) *dnorm(Height, mu_2, sqrt(sigma_2)))) %>%
+  mutate(
+    p_female = p_1 * dnorm(Height, mu_1, sqrt(sigma_1)) / (
+      p_1 * dnorm(Height, mu_1, sqrt(sigma_1)) +  (1 - p_1) * dnorm(Height, mu_2, sqrt(sigma_2))
+    ),
+    p_male = (1 - p_1) * dnorm(Height, mu_2, sqrt(sigma_2)) / (
+      p_1 * dnorm(Height, mu_1, sqrt(sigma_1)) +  (1 - p_1) * dnorm(Height, mu_2, sqrt(sigma_2))
+    )
+  ) %>%
   mutate(gender_guess = ifelse(p_female > p_male, 1, 2)) %>%
   mutate(correct = ifelse(gender_guess == Gender, T, F))
 
@@ -220,7 +237,7 @@ ggplot(X_hat, aes(x = correct, y = Height)) +
   theme_bw()
 ```
 
-
+We correctly classified `r mean(X_hat$correct)` of the samples.
 
 
 ### 2 Chutes & Ladders (Again)
@@ -259,10 +276,12 @@ for (i in 1:nrow(chutes_ladders)) {
 }
 
 require(expm)
+
 win_probs <- sapply(1:50, function(x){
   P_n = (P %^% x)
   return(P_n[1, 101])
 })
+
 Chutes_cdf <- data.frame(
   n = c(1:50),
   win_prob = win_probs
@@ -348,7 +367,8 @@ eigP <- eigen(P)
 
 ```
 
-The relaxation time is indicative of how long it takes to converge to the stationary distribution, so every 5.59 turns the time remaining to converge decreases by a factor of $1/e \approx 0.368$
+The relaxation time is indicative of how long it takes to converge to the stationary distribution, so every 5.59 turns the time remaining to converge decreases by a factor of $1/e \approx 0.368$. Considering the average game lasts about 35 turns, from HW2, this seems faster than we may expect. This suggests that perhaps the randomness of the chutes and ladders quickly move a player around the board, creating faster convergence.
+
 
 ##### iii) Now suppose that we play the game as follows. Each round, with probaility $p$, the player doesn't move. With probability $1-p$ the player rolls the die and moves as usual. For $p = .9, .99, .999$, compute the relaxation times
 
@@ -400,32 +420,6 @@ relaxationTime(P.999)
 
 
 As $p$ increases, and we have less movement with each turn, the relaxation time increases, approximately by a factor of 10 with each example given. This indicates that it takes longer to converge to the stationary distribution, which makes sense as there are a lot more turns without any movement.
-
-
-
-
-
-
-
-
-$\left(p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}\right) = \frac{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}}{\sqrt{2\pi\sigma_1^2\sigma_2^2}} + \frac{(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}{\sqrt{2\pi\sigma_1^2\sigma_2^2}} \Rightarrow$
-
-$$\log\left[\frac{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}{\sqrt{2\pi\sigma_1^2\sigma_2^2}} \right] = \\ \log\left[p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2} \right] - \frac{1}{2}\log\left[2\pi\sigma_1^2\sigma_2^2\right]$$
-
-$$ \sum_{i=1}^N\left[\log \left(p_1\frac{1}{\sqrt{2\pi\sigma_{1}^2}}e^{-(\hat{X}_i - \mu_1)^2/(2\sigma_1^2)} + (1-p_1)\frac{1}{\sqrt{2\pi\sigma_2^2}}e^{-(\hat{X}_i-\mu_2)^2/(2\sigma_2^2)}\right)\right] = \sum_{i=1}^N \left(log\left[p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2} \right]\right) - \frac{N}{2}\log\left[2\pi\sigma_1^2\sigma_2^2\right]$$
-
-$$\frac{\partial\ell}{\partial p_1} = \sum_{i=1}^N \frac{\left( e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2} -e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}\right)}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}$$
-
-$$\frac{\partial \ell}{\partial \mu_1} = \sum_{i=1}^N \frac{p_1\sqrt{\sigma_2^2}e^{-(\hat{X}-\mu_1)^2/2\sigma_1^2}\cdot \frac{\hat{X} - \mu_1}{2}}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}$$
-
-$$\frac{\partial \ell}{\partial \mu_2} = \sum_{i=1}^N \frac{(1-p_1)\sqrt{\sigma_1^2}e^{-(\hat{X}-\mu_2)^2/2\sigma_2^2}\cdot \frac{\hat{X} - \mu_2}{2}}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}}$$
-
-$$\frac{\partial \ell}{\partial \sigma_1^2} = \sum_{i=1}^N \left(\frac{p_1\sqrt{\sigma_2^2}e^{-(\hat{X}-\mu_1)^2/2\sigma_1^2} \cdot \frac{(x-\mu_1)^2}{2(\sigma_1^2)^2} + \frac{1-p_1}{2\sqrt{\sigma_1^2}}e^{-(\hat{X} - \mu_2)^2/2\sigma_2^2}}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}} \right)- \frac{N}{2\sigma_1^2}$$
-
-$$\frac{\partial \ell}{\partial \sigma_1^2} = \sum_{i=1}^N \left( \frac{(1-p_1)\sqrt{\sigma_1^2}e^{-(\hat{X}-\mu_2)^2/2\sigma_2^2} \cdot \frac{(x-\mu_2)^2}{2(\sigma_2^2)^2} + \frac{p_1}{2\sqrt{\sigma_2^2}}e^{-(\hat{X} - \mu_1)^2/2\sigma_1^2}}{p_1 e^{-(\hat{X}-\mu_1)^2/(2\sigma_1^2)}\sqrt{\sigma_2^2}+(1-p_1) e^{-(\hat{X}-\mu_2)^2/(2\sigma_2^2)}\sqrt{\sigma_1^2}} \right) - \frac{N}{2\sigma_2^2}$$
-
-
-
 
 
 
