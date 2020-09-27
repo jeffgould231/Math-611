@@ -1,0 +1,104 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath, amsthm, verbatim}
+
+\begin{document}
+
+
+\renewcommand{\a}{\textbf{a}}
+\renewcommand{\b}{\textbf{b}}
+\renewcommand{\d}{\textbf{d}}
+\newcommand{\e}{\textbf{e}}
+
+\large
+
+\begin{center}
+\textbf{Homework \# 4} \\  
+\end{center}
+
+\medskip
+
+
+\medskip
+
+
+
+
+\begin{enumerate} 
+
+\item Reading (optional).
+\begin{enumerate}
+\item Section $9.2-9.4$ discuss hard and soft EM, the rigorous definition of EM, and kmeans
+\item Section $11.2$ discusses Markov chains (not very clearly) and Metropolis-Hastings.
+\end{enumerate}
+
+% Fall 2019, hw 4, problem 1
+\item In this problem, we will revisit the Hope heights problem of HW $3$, but this time we will use EM.  Recall, we consider the two component Gaussian mixture model,
+\begin{equation}
+X = \bigg\{
+\begin{array}{cc}
+\mathcal{N}(\mu_1, \sigma_1^2) & \text{ with probability } p_1 \\
+\mathcal{N}(\mu_2, \sigma_2^2) & \text{ with probability } p_2
+\end{array}
+\end{equation}
+where $\mathcal{N}(\mu, \sigma^2)$ is the normal distribution and $X$ models the height of a person when gender is unknown.  Let $\hat{X}_1, \hat{X}_2,\dots, \hat{X}_N$ be the sample heights given in the file.  
+\begin{enumerate}
+\item Take a hard EM approach and compute the parameters of the model.
+\item Take a soft EM approach and compute the parameters of the model.  Compare to your results in (a).
+\item Given your parameters in (b), use the distribution of $X$ to predict whether a given sample is taken from a man or woman.    Determine what percentage of individuals are classified correctly. 
+\end{enumerate}
+
+% Fall 2019, hw 5, problem 2
+\item Attached you will find the file \verb+TimeSeries.csv+.  The file contains a $1000$ by $20$ matrix.  Each row represents a sample of a random vector $X \in \mathbb{R}^{20}$, but $X$ represents time series data, so that $X_1, X_2, \dots, X_{20}$ represent measurements at times $1, 2, \dots, 20$, respectively.  Often, we have a collection of time series samples and would like to separate the samples into similar groups, i.e. cluster.  Here we'll do this by using a multivariate normal mixture model.  
+
+To visualize the data, produce a line plot of each sample.  In R, you can execute
+\begin{verbatim}
+plot(m[1,], type="l", ylim=c(-12,12))
+for (i in 2:1000) {
+  lines(m[i,])
+}
+\end{verbatim}
+where \verb+m+ is the matrix in the csv file.  You'll see that the time series are not easy to distinguish.  The file \verb+make_timeseries.R+ contains the code used to make the data.  The data is based on $4$ underlying time series found in the file $\verb+BaseSeries.csv+$ which contains a $4 \times 20$ matrix.   Look through the files and explain how the data was generated.  
+
+Now assume the following model for $X$
+\begin{equation}
+X = \left\{
+\begin{array}{cc}
+\mathcal{N}(\mu^{(1)}, \Sigma^{(1)}) & \text{ with probability } p_1 \\
+\mathcal{N}(\mu^{(2)}, \Sigma^{(2)}) & \text{ with probability } p_2\\
+\vdots & \\
+\mathcal{N}(\mu^{(K)}, \Sigma^{(K)}) & \text{ with probability } p_K
+\end{array}
+\right.
+\end{equation}
+Each of the $\mu^{(i)} \in \mathbb{R}^{20}$ and each $\Sigma^{(i)}$ is a $20 \times 20$ covariance matrix.  $K$ is the number of mixtures, which we must choose. (In this case, since you know the solution, you can set $K=4$.)
+\begin{enumerate}
+\item To fit this model using EM, you need to know how to derive the MLE of a multivariate normal.  Let $Z$ be an $n$-dimensional multivariate normal with mean $\mu$ and covariance matrix $\Sigma$.  Let $\hat{Z}^{(i)}$ be iid samples from $Z$ for $i=1,2,\dots,N$.   Write down the log-likelihood and use it to show that  the MLE estimate $\hat{\mu}$ of $\mu$ is given by the sample mean of the $\hat{Z}^{(i)}$.   Then read Chis Murphy's section $4.1.3$ of the book Machine Learning (attached) and in your own words summarize the steps needed to derive the MLE for the variance (or derive it yourself if you prefer).  (Bishop does not include the derivation in his book.)
+\item Take a \textbf{hard} EM approach to estimating the parameters of the model.   When you stop your iteration, plot the $\mu^{(i)}$ and determine if you have recovered the underlying time series used to generate the data.  
+\item Now repeat, but take a \textbf{soft} EM approach.  Compare your result to what you found using a hard EM approach.
+\end{enumerate}
+
+
+\item Consider the hard core model on a $100 \times 100$ grid.   Let $\Omega$ be the set of all configurations and $H$  the set of configurations that do not violate the hard-core restriction (no neighboring $1$'s).  For $w \in \Omega$ let $f(w)$ be the number of positions with a $1$ in the grid.  
+\begin{enumerate}
+\item Let $X$ be the r.v. on $\Omega$,
+\begin{equation}
+P(X=w) = \bigg\{
+\begin{array}{cc}
+\frac{1}{|H|} & \text{if } w \in H \\
+0 & \text{otherwise}
+\end{array}
+\end{equation}
+Using the Metropolis-Hasting algorithm, write a sampler for $X$.  Show a sample configurations using the $\textbf{image}$ function in R (or equivalent in Python).   Using your sampler, generate a histogram for $f(X)/100^2$, the fraction of sites with a $1$ under the uniform distribution $X$.  To decide how long to run the MH-algorithm before sampling, plot $f(X)$ as a function of the time step of your chain.   If plotted on a long enough time scale, the plot should look noisy.   Once you decide how long to run the chain, run the chain many times to produce a histogram.   (Each time you sample from the Metropolis-Hastings algorithm you have to rerun the chain.)
+\item Let $Y$ be the r.v. on $\Omega$ defined by $P(Y = w) = \alpha (f(w))^2$, where $\alpha$ is a normalizing constant that makes the probabilities sum to $1$.   Use your sampler to generate a histogram for $f(Y)/100^2$.  Compare to part a).
+\end{enumerate}
+
+%\item Suppose we would like to sample the r.v. $X$, where $X \in \{1,2,3\}$ and $P(X = i) = v_i$ for $i=1,2,3$ and where $v = (v_1, v_2, v_3) = (1/2, 1/3, 1/6)$.  
+%\begin{enumerate}
+%\item Write a function to do this using a single draw from a uniform r.v.  You may not use your languages discrete random sampler (e.g. sample or sample.int in R).  We discussed how to do this at the very beginning of the semester.
+%\item Now use the Metropolis-Hastings algorithm to write a sampler for $X$.   Given that we are in state $i$, let the proposal be $1$ with probability $.99$, $2$ with probability $.009$ and $3$ with probability $.001$.  (Notice, in this case the proposal doesn't depend on the current state, but this is not always the case.)   Write a function in R/Python to implement the Metropolis-Hastings algorithm.   Your function simulates a Markov chain, write down the transition probability matrix of the markov chain.  (Typically, we don't write this matrix down, but in this simple setting it is a good exercise.).   How long do you have to run the chain to be close to the stationary distribution?   
+
+\end{enumerate}
+
+
+\end{document}

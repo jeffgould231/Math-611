@@ -1,0 +1,456 @@
+---
+title: "Math 611 HW4"
+author: "Jeff Gould"
+date: "9/26/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+
+
+
+
+\begin{enumerate} 
+
+\item Reading (optional).
+\begin{enumerate}
+\item Section $9.2-9.4$ discuss hard and soft EM, the rigorous definition of EM, and kmeans
+\item Section $11.2$ discusses Markov chains (not very clearly) and Metropolis-Hastings.
+\end{enumerate}
+
+% Fall 2019, hw 4, problem 1
+\item In this problem, we will revisit the Hope heights problem of HW $3$, but this time we will use EM.  Recall, we consider the two component Gaussian mixture model,
+\begin{equation}
+X = \bigg\{
+\begin{array}{cc}
+\mathcal{N}(\mu_1, \sigma_1^2) & \text{ with probability } p_1 \\
+\mathcal{N}(\mu_2, \sigma_2^2) & \text{ with probability } p_2
+\end{array}
+\end{equation}
+where $\mathcal{N}(\mu, \sigma^2)$ is the normal distribution and $X$ models the height of a person when gender is unknown.  Let $\hat{X}_1, \hat{X}_2,\dots, \hat{X}_N$ be the sample heights given in the file.  
+\begin{enumerate}
+\item Take a hard EM approach and compute the parameters of the model.
+
+$\theta = (\mu_1, \mu_2, \sigma^2_1, \sigma^2_2, p_1, p_2)$, where $p_1 + p_2 = 1$, $z = (Female, Male) = (z_1, z_2)$
+
+$P(X|\mu, \sigma, \pi) = p_1\mathcal{N}(X|\mu_1, \sigma_1^2) + p_2\mathcal{N}(X|\mu_2, \sigma_2^2)$
+
+```{r fig.width=3}
+
+set.seed(123)
+hopeHeights <- read.table("Hope Heights.txt", header = TRUE)
+
+X <- hopeHeights$Height
+X_synth <- c(X, X + rnorm(1000, mean = 0, sd = 1.2))
+
+### Initialize theta with k means clustering
+
+X.kmeans <- kmeans(X_synth, 2)
+
+X.kmeans.cluster <- X.kmeans$cluster
+
+data.frame(x = X, class = as.factor((X.kmeans.cluster + 1)%%3)) %>%
+  ggplot(aes(x = x, y = 0, color = class)) +
+  geom_jitter() + theme_bw()
+
+X.kmeans.summary <- data.frame(x = X_synth,
+                               class = as.factor(X.kmeans.cluster)) %>%
+  group_by(class) %>%
+  summarise(n = n(),
+            pi = n() / length(X_synth),
+            mu = mean(x),
+            sigma2 = sd(x)^2)
+
+init_theta <- c(X.kmeans.summary$mu, X.kmeans.summary$sigma2, X.kmeans.summary$pi) %>%
+  setNames(c("mu1", "mu2", "s1", "s2", "p1", "p2"))
+
+e_step_hard <- function(x, theta) {
+  
+  mu1 <- theta["mu1"]
+  mu2 <- theta["mu2"]
+  s1 <- theta["s1"]
+  s2 <- theta["s2"]
+  p1 <- theta["p1"]
+  p2 <- theta["p2"]
+  
+  z1 <- dnorm(x, mu1, sqrt(s1)) * p1
+  z2 <- dnorm(x, mu2, sqrt(s2)) * p2
+  
+  Z <- apply(cbind(z1, z2), 1, which.max)
+
+  return(Z)
+}
+
+m_step_hard <- function(x, Z) {
+  
+  n1 <- sum(Z == 1)
+  n2 <- sum(Z == 2)
+
+  mu1 <- 1/n1 * sum(x[Z == 1])
+  mu2 <- 1/n2 * sum(x[Z == 2])
+
+  s1 <- sum((x[Z == 1] - mu1)^2) * 1/n1
+  s2 <- sum((x[Z == 2] - mu2)^2) * 1/n2
+
+  p1 <- n1 / length(x)
+  p2 <- n2 / length(x)
+
+  return(c(mu1, mu2, s1, s2, p1, p2) %>% setNames(c("mu1", "mu2", "s1", "s2", "p1", "p2")))
+}
+
+EM_hard <- function(x, start_theta, max_iter = 1000){
+  
+  start_theta <- start_theta %>% 
+    setNames(c("mu1", "mu2", "s1", "s2", "p1", "p2"))
+  
+  e.step <- e_step_hard(X, theta = start_theta)
+  m.step.theta <- m_step_hard(X, e.step)
+  
+  iter <- 1
+  while(iter <= max_iter) {
+
+    e.step <- e_step_hard(X, m.step.theta)
+    m.step <- m_step_hard(X, e.step)
+    iter <- iter + 1
+  }
+  
+  return(list(Class = e.step,
+              theta = m.step))
+  
+}
+
+set.seed(12)
+test <- EM_hard(X, c(mean(X) + rnorm(1), mean(X)+ rnorm(1), sd(X), sd(X), 0.45, 0.55))
+test <- EM_hard(X_synth, init_theta)
+test$theta
+View(test$Class[1:100])
+
+
+results <- data.frame(heights = X,
+                      class = as.factor(test$Class),
+                      actual = as.factor(hopeHeights$Gender))
+
+ggplot(data = results, aes(x = heights, fill  = actual)) +
+  geom_histogram(binwidth = 1, position = "dodge") + theme_bw()
+
+ggplot(data = results, aes(x = heights, fill  = class)) +
+  geom_histogram(binwidth = 1)+ theme_bw()
+
+```
+\item Take a soft EM approach and compute the parameters of the model.  Compare to your results in (a).
+
+
+```{r }
+# 
+# set.seed(123)
+# init_theta <- c(runif(2, min(X)*0.8, max(X)*1.2), (sd(X) + rnorm(2, 1, 1))^2, 0.6, 0.4)
+
+```
+
+
+```{r  }
+
+e_step_soft <- function(x, theta) {
+  
+  mu1 <- theta["mu1"]
+  mu2 <- theta["mu2"]
+  s1 <- theta["s1"]
+  s2 <- theta["s2"]
+  p1 <- theta["p1"]
+  p2 <- theta["p2"]
+  
+  z1 <- dnorm(x, mu1, sqrt(s1)) * p1
+  z2 <- dnorm(x, mu2, sqrt(s2)) * p2
+  
+  sum.of.zs <- z1 + z2
+  
+  z1.post <- z1 / sum.of.zs
+  z2.post <- z2 / sum.of.zs
+
+  logLike <- sum(log(sum.of.zs))
+
+  return(list("loglik" = logLike,
+       "posterior.df" = cbind(z1.post, z2.post)))
+}
+
+m_step_soft <- function(x, posterior.df) {
+  
+  m1 <- sum(posterior.df[, 1])
+  m2 <- sum(posterior.df[, 2])
+
+  mu1 <- 1/m1 * sum(posterior.df[, 1] * x)
+  mu2 <- 1/m2 * sum(posterior.df[, 2] * x)
+
+  s1 <- sum(posterior.df[, 1] * (x - mu1)^2) * 1/m1
+  s2 <- sum(posterior.df[, 2] * (x - mu2)^2) * 1/m2
+
+  p1 <- m1 / length(x)
+  p2 <- m2 / length(x)
+
+  return(c(mu1, mu2, s1, s2, p1, p2) %>% setNames(c("mu1", "mu2", "s1", "s2", "p1", "p2")))
+}
+
+
+EM_soft <- function(x, init_theta, max_iter = 100, epsilon = 1e-4){
+  
+  init_theta <- init_theta %>%
+    setNames(c("mu1", "mu2", "s1", "s2", "p1", "p2"))
+  
+  for (i in 1:max_iter) {
+    if (i == 1) {
+      # Initialization
+      e.step <- e_step_soft(X, init_theta)
+      m.step <- m_step_soft(X, e.step[["posterior.df"]])
+      cur.loglik <- e.step[["loglik"]]
+      loglik.vector <- e.step[["loglik"]]
+    } else {
+      # Repeat E and M steps till convergence
+      e.step <- e_step_soft(X, m.step)
+      m.step <- m_step_soft(X, e.step[["posterior.df"]])
+      loglik.vector <- c(loglik.vector, e.step[["loglik"]])
+      
+      loglik.diff <- abs((cur.loglik - e.step[["loglik"]]))
+      if(loglik.diff < epsilon) {
+        break
+      } else {
+        cur.loglik <- e.step[["loglik"]]
+      }
+    }
+  }
+  
+  return(list(
+    theta = m.step,
+    logL_history = loglik.vector
+  ))
+}
+
+set.seed(21)
+test <- EM_soft(X, 
+                init_theta = c(mean(X) + rnorm(1), mean(X)+ rnorm(1), sd(X)+ rnorm(1)^2, sd(X)+ rnorm(1)^2, 0.45, 0.55),
+                max_iter = 100,
+                epsilon = 1e-3)
+test$theta
+test$logL_history
+
+plot(test$logL_history)
+
+```
+\item Given your parameters in (b), use the distribution of $X$ to predict whether a given sample is taken from a man or woman.    Determine what percentage of individuals are classified correctly. 
+\end{enumerate}
+
+% Fall 2019, hw 5, problem 2
+\item Attached you will find the file \verb+TimeSeries.csv+.  The file contains a $1000$ by $20$ matrix.  Each row represents a sample of a random vector $X \in \mathbb{R}^{20}$, but $X$ represents time series data, so that $X_1, X_2, \dots, X_{20}$ represent measurements at times $1, 2, \dots, 20$, respectively.  Often, we have a collection of time series samples and would like to separate the samples into similar groups, i.e. cluster.  Here we'll do this by using a multivariate normal mixture model.  
+
+To visualize the data, produce a line plot of each sample.  In R, you can execute
+\begin{verbatim}
+plot(m[1,], type="l", ylim=c(-12,12))
+for (i in 2:1000) {
+  lines(m[i,])
+}
+\end{verbatim}
+where \verb+m+ is the matrix in the csv file.  You'll see that the time series are not easy to distinguish.  The file \verb+make_timeseries.R+ contains the code used to make the data.  The data is based on $4$ underlying time series found in the file $\verb+BaseSeries.csv+$ which contains a $4 \times 20$ matrix.   Look through the files and explain how the data was generated.  
+
+Now assume the following model for $X$
+\begin{equation}
+X = \left\{
+\begin{array}{cc}
+\mathcal{N}(\mu^{(1)}, \Sigma^{(1)}) & \text{ with probability } p_1 \\
+\mathcal{N}(\mu^{(2)}, \Sigma^{(2)}) & \text{ with probability } p_2\\
+\vdots & \\
+\mathcal{N}(\mu^{(K)}, \Sigma^{(K)}) & \text{ with probability } p_K
+\end{array}
+\right.
+\end{equation}
+Each of the $\mu^{(i)} \in \mathbb{R}^{20}$ and each $\Sigma^{(i)}$ is a $20 \times 20$ covariance matrix.  $K$ is the number of mixtures, which we must choose. (In this case, since you know the solution, you can set $K=4$.)
+\begin{enumerate}
+\item To fit this model using EM, you need to know how to derive the MLE of a multivariate normal.  Let $Z$ be an $n$-dimensional multivariate normal with mean $\mu$ and covariance matrix $\Sigma$.  Let $\hat{Z}^{(i)}$ be iid samples from $Z$ for $i=1,2,\dots,N$.   Write down the log-likelihood and use it to show that  the MLE estimate $\hat{\mu}$ of $\mu$ is given by the sample mean of the $\hat{Z}^{(i)}$.   Then read Chis Murphy's section $4.1.3$ of the book Machine Learning (attached) and in your own words summarize the steps needed to derive the MLE for the variance (or derive it yourself if you prefer).  (Bishop does not include the derivation in his book.)
+\item Take a \textbf{hard} EM approach to estimating the parameters of the model.   When you stop your iteration, plot the $\mu^{(i)}$ and determine if you have recovered the underlying time series used to generate the data.  
+\item Now repeat, but take a \textbf{soft} EM approach.  Compare your result to what you found using a hard EM approach.
+\end{enumerate}
+
+
+\item Consider the hard core model on a $100 \times 100$ grid.   Let $\Omega$ be the set of all configurations and $H$  the set of configurations that do not violate the hard-core restriction (no neighboring $1$'s).  For $w \in \Omega$ let $f(w)$ be the number of positions with a $1$ in the grid.  
+\begin{enumerate}
+\item Let $X$ be the r.v. on $\Omega$,
+\begin{equation}
+P(X=w) = \bigg\{
+\begin{array}{cc}
+\frac{1}{|H|} & \text{if } w \in H \\
+0 & \text{otherwise}
+\end{array}
+\end{equation}
+Using the Metropolis-Hasting algorithm, write a sampler for $X$.  Show a sample configurations using the $\textbf{image}$ function in R (or equivalent in Python).   Using your sampler, generate a histogram for $f(X)/100^2$, the fraction of sites with a $1$ under the uniform distribution $X$.  To decide how long to run the MH-algorithm before sampling, plot $f(X)$ as a function of the time step of your chain.   If plotted on a long enough time scale, the plot should look noisy.   Once you decide how long to run the chain, run the chain many times to produce a histogram.   (Each time you sample from the Metropolis-Hastings algorithm you have to rerun the chain.)
+
+```{r }
+
+w <- matrix(0, nrow = 100, ncol = 100)
+X_0 <- w
+X <- X_0
+
+f_X <- matrix(c(sum(X_0), 0), ncol = 2)
+
+is_hardcore <- function(W){
+  
+  ### Check rowwise hardcore
+  hc_rowwise <- !any(apply(W, 1, function(x){
+    any(x[1:99] + x[2:100] == 2)
+  }))
+  
+  ### Check column wise hardcore
+  hc_columnwise <- !any(apply(W, 2, function(x){
+    any(x[1:99] + x[2:100] == 2)
+  }))
+  
+  return(!any(!hc_rowwise, !hc_columnwise))
+  
+}
+
+set.seed(123)
+iteration = 1
+while (iteration <= 250000) {
+  
+  i <- runif(1, 1, 100) %>% round()
+  j <- runif(1, 1, 100) %>% round()
+  
+  if(w[i,j] == 0){
+    w[i,j] = 1
+  }else{
+      w[i,j] = 0
+    }
+  
+  HardCore <- is_hardcore(w)
+  
+  if(HardCore){
+    X <- w
+    last_HC <- iteration
+  }
+  if(iteration - last_HC >= 100){
+    w <- X
+    w[sample(1:100, 5), sample(1:100, 5)] = 0}
+  
+  f_X <- rbind(f_X, c(sum(X), iteration))
+  if(iteration %% 10000 == 0){image(X)}
+  if(iteration %% 5000 == 0){print(iteration)}
+  
+  iteration <- iteration + 1
+  
+}
+
+
+f_X %>% as.data.frame() %>% ggplot(aes(x = V2, y = V1)) + geom_line()
+
+
+
+```
+
+
+
+```{r }
+
+MHHardcoreAlgo <- function(iterations){
+  
+  w <- matrix(0, nrow = 100, ncol = 100)
+  X_0 <- w
+  X <- X_0
+  
+  #f_X <- matrix(c(sum(X_0), 0), ncol = 2)
+  
+  is_hardcore <- function(W){
+    
+    ### Check rowwise hardcore
+    hc_rowwise <- !any(apply(W, 1, function(x){
+      any(x[1:99] + x[2:100] == 2)
+    }))
+    
+    ### Check column wise hardcore
+    hc_columnwise <- !any(apply(W, 2, function(x){
+      any(x[1:99] + x[2:100] == 2)
+    }))
+    
+    return(!any(!hc_rowwise, !hc_columnwise))
+    
+  }
+  
+  iter = 1
+  while (iter <= iterations) {
+    
+    i <- round(runif(1, 1, 100))
+    j <- round(runif(1, 1, 100))
+    
+    if(w[i,j] == 0){
+      w[i,j] = 1
+    }else{
+      w[i,j] = 0
+    }
+    
+    HardCore <- is_hardcore(w)
+    
+    if(HardCore){
+      X <- w
+      last_HC <- iter
+    }
+    if(iter - last_HC >= 100){
+      w <- X
+      w[sample(1:100, 4), sample(1:100, 4)] = 0}
+    
+    #f_X <- rbind(f_X, c(sum(X), iter))
+    
+    iter <- iter + 1
+    
+  }
+  
+  return(sum(X))
+}
+
+library(parallel)
+cl <- parallel::makeCluster(detectCores() - 1)
+f_X_dist <- parSapply(cl = cl, X = rep(60000, 100), FUN = MHHardcoreAlgo)
+stopCluster(cl)
+
+ggplot(data.frame(fX = f_X_dist), aes(x = fX/100^2)) +
+  geom_histogram()
+
+```
+
+
+\item Let $Y$ be the r.v. on $\Omega$ defined by $P(Y = w) = \alpha (f(w))^2$, where $\alpha$ is a normalizing constant that makes the probabilities sum to $1$.   Use your sampler to generate a histogram for $f(Y)/100^2$.  Compare to part a).
+\end{enumerate}
+
+%\item Suppose we would like to sample the r.v. $X$, where $X \in \{1,2,3\}$ and $P(X = i) = v_i$ for $i=1,2,3$ and where $v = (v_1, v_2, v_3) = (1/2, 1/3, 1/6)$.  
+%\begin{enumerate}
+%\item Write a function to do this using a single draw from a uniform r.v.  You may not use your languages discrete random sampler (e.g. sample or sample.int in R).  We discussed how to do this at the very beginning of the semester.
+%\item Now use the Metropolis-Hastings algorithm to write a sampler for $X$.   Given that we are in state $i$, let the proposal be $1$ with probability $.99$, $2$ with probability $.009$ and $3$ with probability $.001$.  (Notice, in this case the proposal doesn't depend on the current state, but this is not always the case.)   Write a function in R/Python to implement the Metropolis-Hastings algorithm.   Your function simulates a Markov chain, write down the transition probability matrix of the markov chain.  (Typically, we don't write this matrix down, but in this simple setting it is a good exercise.).   How long do you have to run the chain to be close to the stationary distribution?   
+
+\end{enumerate}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
