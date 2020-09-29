@@ -18,10 +18,11 @@ sample_assignment <- sample.int(K, N, replace = T, prob = assign_prob)
 
 samples <- base_ts[sample_assignment,]
 # add noise
-samples <- samples + matrix(rnorm(K*N, mean=0, sd=2), nrow=N, ncol=n)
+samples <- samples + matrix(rnorm(n*N, mean=0, sd=2), nrow=N, ncol=n)
 
 write.csv(samples, file="TimeSeries.csv", row.names = F)
 write.csv(base_ts, file="BaseSeries.csv", row.names = F)
+write.csv(sample_assignment, file="SampleAssignment.csv", row.names=F)
 
 # plot base time series
 plot(base_ts[1,], type="l", ylim=c(-12, 12))

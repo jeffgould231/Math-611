@@ -2,15 +2,13 @@
 title: "Math 611 HW4"
 author: "Jeff Gould"
 date: "9/26/2020"
-output: pdf_document
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 ```
-
-
 
 
 
@@ -40,29 +38,29 @@ $\theta = (\mu_1, \mu_2, \sigma^2_1, \sigma^2_2, p_1, p_2)$, where $p_1 + p_2 = 
 
 $P(X|\mu, \sigma, \pi) = p_1\mathcal{N}(X|\mu_1, \sigma_1^2) + p_2\mathcal{N}(X|\mu_2, \sigma_2^2)$
 
-```{r fig.width=3}
+```{r fig.width=4, fig.height=3}
 
 set.seed(123)
 hopeHeights <- read.table("Hope Heights.txt", header = TRUE)
 
 X <- hopeHeights$Height
-X_synth <- c(X, X + rnorm(1000, mean = 0, sd = 1.2))
+#X_synth <- c(X, X + rnorm(1000, mean = 0, sd = 1.2))
 
 ### Initialize theta with k means clustering
 
-X.kmeans <- kmeans(X_synth, 2)
+X.kmeans <- kmeans(X, 2)
 
 X.kmeans.cluster <- X.kmeans$cluster
 
-data.frame(x = X, class = as.factor((X.kmeans.cluster + 1)%%3)) %>%
+data.frame(x = X, class = as.factor(3-X.kmeans.cluster)) %>%
   ggplot(aes(x = x, y = 0, color = class)) +
   geom_jitter() + theme_bw()
 
-X.kmeans.summary <- data.frame(x = X_synth,
+X.kmeans.summary <- data.frame(x = X,
                                class = as.factor(X.kmeans.cluster)) %>%
   group_by(class) %>%
   summarise(n = n(),
-            pi = n() / length(X_synth),
+            pi = n() / length(X),
             mu = mean(x),
             sigma2 = sd(x)^2)
 
@@ -103,7 +101,7 @@ m_step_hard <- function(x, Z) {
   return(c(mu1, mu2, s1, s2, p1, p2) %>% setNames(c("mu1", "mu2", "s1", "s2", "p1", "p2")))
 }
 
-EM_hard <- function(x, start_theta, max_iter = 1000){
+EM_hard <- function(x, start_theta, max_iter = 50){
   
   start_theta <- start_theta %>% 
     setNames(c("mu1", "mu2", "s1", "s2", "p1", "p2"))
@@ -125,14 +123,14 @@ EM_hard <- function(x, start_theta, max_iter = 1000){
 }
 
 set.seed(12)
-test <- EM_hard(X, c(mean(X) + rnorm(1), mean(X)+ rnorm(1), sd(X), sd(X), 0.45, 0.55))
-test <- EM_hard(X_synth, init_theta)
-test$theta
-View(test$Class[1:100])
+#test <- EM_hard(X, c(mean(X) + rnorm(1), mean(X)+ rnorm(1), sd(X), sd(X), 0.45, 0.55))
+test_hard <- EM_hard(X, init_theta)
+test_hard$theta
+#View(test$Class[1:100])
 
 
 results <- data.frame(heights = X,
-                      class = as.factor(test$Class),
+                      class = as.factor(test_hard$Class),
                       actual = as.factor(hopeHeights$Gender))
 
 ggplot(data = results, aes(x = heights, fill  = actual)) +
@@ -196,7 +194,7 @@ m_step_soft <- function(x, posterior.df) {
 }
 
 
-EM_soft <- function(x, init_theta, max_iter = 100, epsilon = 1e-4){
+EM_soft <- function(x, init_theta, max_iter = 50, epsilon = 1e-4){
   
   init_theta <- init_theta %>%
     setNames(c("mu1", "mu2", "s1", "s2", "p1", "p2"))
@@ -225,26 +223,68 @@ EM_soft <- function(x, init_theta, max_iter = 100, epsilon = 1e-4){
   
   return(list(
     theta = m.step,
-    logL_history = loglik.vector
+    logL_history = loglik.vector,
+    probs = e.step[["posterior.df"]]
   ))
 }
 
 set.seed(21)
-test <- EM_soft(X, 
+test_soft <- EM_soft(X, 
                 init_theta = c(mean(X) + rnorm(1), mean(X)+ rnorm(1), sd(X)+ rnorm(1)^2, sd(X)+ rnorm(1)^2, 0.45, 0.55),
-                max_iter = 100,
+                max_iter = 50,
                 epsilon = 1e-3)
-test$theta
-test$logL_history
 
-plot(test$logL_history)
+#test$logL_history
+
+plot(test_soft$logL_history)
+
+test_soft$theta
+test_hard$theta
+```
+
+We see similar paramters using the hard and soft EM approaches, except that we had larger variances using soft EM
+
+\item Given your parameters in (b), use the distribution of $X$ to predict whether a given sample is taken from a man or woman.    Determine what percentage of individuals are classified correctly. 
+
+```{r }
+
+X_soft <- hopeHeights
+X_soft$results = test_soft$probs[,1]
+X_soft$Gender = as.factor(X_soft$Gender)
+
+ggplot(X_soft, aes(x = Gender, y = Height)) +
+  geom_point(aes(color = results)) +
+  #scale_color_brewer(palette = "Spectral")
+  scale_color_gradient2(low = "#9E0142", mid = "#FFFFBF", high = "#5E4FA2", midpoint = 0.51) +
+  theme_bw()
+
+X_soft <- X_soft %>%
+  mutate(genderGuess = ifelse(results <= 0.51, 2, 1)) %>%
+  mutate(genderGuess = as.factor(genderGuess))
+
+
+sum(X_soft$Gender == X_soft$genderGuess) / nrow(X_soft)
 
 ```
-\item Given your parameters in (b), use the distribution of $X$ to predict whether a given sample is taken from a man or woman.    Determine what percentage of individuals are classified correctly. 
+
+87% of individuals are correctly classified using the soft EM approach
+
 \end{enumerate}
 
 % Fall 2019, hw 5, problem 2
 \item Attached you will find the file \verb+TimeSeries.csv+.  The file contains a $1000$ by $20$ matrix.  Each row represents a sample of a random vector $X \in \mathbb{R}^{20}$, but $X$ represents time series data, so that $X_1, X_2, \dots, X_{20}$ represent measurements at times $1, 2, \dots, 20$, respectively.  Often, we have a collection of time series samples and would like to separate the samples into similar groups, i.e. cluster.  Here we'll do this by using a multivariate normal mixture model.  
+
+```{r }
+TimeSeries <- read_csv("TimeSeries.csv")
+X <- TimeSeries %>% as.matrix()
+#plot(TimeSeries[1,], type="l", ylim=c(-12,12))
+
+# for (i in 2:1000) {
+#   lines(TimeSeries[i,])
+# }
+
+
+```
 
 To visualize the data, produce a line plot of each sample.  In R, you can execute
 \begin{verbatim}
@@ -267,10 +307,262 @@ X = \left\{
 \right.
 \end{equation}
 Each of the $\mu^{(i)} \in \mathbb{R}^{20}$ and each $\Sigma^{(i)}$ is a $20 \times 20$ covariance matrix.  $K$ is the number of mixtures, which we must choose. (In this case, since you know the solution, you can set $K=4$.)
+
 \begin{enumerate}
+
 \item To fit this model using EM, you need to know how to derive the MLE of a multivariate normal.  Let $Z$ be an $n$-dimensional multivariate normal with mean $\mu$ and covariance matrix $\Sigma$.  Let $\hat{Z}^{(i)}$ be iid samples from $Z$ for $i=1,2,\dots,N$.   Write down the log-likelihood and use it to show that  the MLE estimate $\hat{\mu}$ of $\mu$ is given by the sample mean of the $\hat{Z}^{(i)}$.   Then read Chis Murphy's section $4.1.3$ of the book Machine Learning (attached) and in your own words summarize the steps needed to derive the MLE for the variance (or derive it yourself if you prefer).  (Bishop does not include the derivation in his book.)
+
+
+\begin{equation}
+
+l(\mathbf{ \mu, \Sigma | x^{(i)} }) = \log \prod_{i=1}^m f_{\mathbf{X^{(i)}}}(\mathbf{x^{(i)} | \mu , \Sigma }) \\
+
+= \log \prod_{i=1}^m \frac{1}{(2 \pi)^{p/2} |\Sigma|^{1/2}} \exp \left( - \frac{1}{2} \mathbf{(x^{(i)} - \mu)^T \Sigma^{-1} (x^{(i)} - \mu) } \right) \\
+
+= \sum_{i=1}^m \left( - \frac{p}{2} \log (2 \pi) - \frac{1}{2} \log |\Sigma|  - \frac{1}{2}   \mathbf{(x^{(i)} - \mu)^T \Sigma^{-1} (x^{(i)} - \mu) }  \right) \\
+
+\frac{\partial l}{\partial \mu} = \sum_{i=1}^m \Sigma^{-1}(\mu - x^{(i)}) = \Sigma^{-1} \sum_{i=1}^m (\mu - x^{(i)}) = 0 \\
+
+0 = m\mu - \sum_{i=1}^m x^{(i)} \\
+
+\mu = \frac{1}{m} \sum_{i=1}^m x^{(i)} = \bar{x}
+
+\end{equation}
+
+In order to find the MLE for variance, we would follow the first few steps as above, but then differentiate with respect to $\Sigma$ instead of $\mu$. In order to do this, we would utilize the "trace-trick" outlined in the attached handout, and differentiate with respect to the determinant. It is also easier to first differentiate with respect to $\Lambda = \Sigma^{-1}$, then substitute at the end and solve for the MLE of $\Sigma$. Following these steps, eventually we get:
+
+$$\hat{\Sigma} = \frac{1}{N}\sum_{i=1}^N(x_i - \mu)(x_i - \mu)^T$$
+
+
 \item Take a \textbf{hard} EM approach to estimating the parameters of the model.   When you stop your iteration, plot the $\mu^{(i)}$ and determine if you have recovered the underlying time series used to generate the data.  
+
+```{r }
+
+init_assignments <- sample(c(1:4), 1000, replace = T)
+Z <- init_assignments
+
+m_step_hard <- function(X, Z){
+  
+  N1 <- sum(Z == 1)
+  N2 <- sum(Z == 2)
+  N3 <- sum(Z == 3)
+  N4 <- sum(Z == 4)
+  
+  mu1 <- 1/N1 * colSums(X[Z == 1,])
+  mu2 <- 1/N2 * colSums(X[Z == 2,])
+  mu3 <- 1/N3 * colSums(X[Z == 3,])
+  mu4 <- 1/N4 * colSums(X[Z == 4,])
+  
+
+  sigma1 <- 1/N1 * t(X[Z==1, ] - matrix(1, nrow = N1) %*% mu1) %*%(X[Z==1, ] - matrix(1, nrow = N1) %*% mu1)
+  sigma2 <- 1/N2 * t(X[Z==2, ] - matrix(1, nrow = N2) %*% mu2) %*%(X[Z==2, ] - matrix(1, nrow = N2) %*% mu2)
+  sigma3 <- 1/N3 * t(X[Z==3, ] - matrix(1, nrow = N3) %*% mu3) %*%(X[Z==3, ] - matrix(1, nrow = N3) %*% mu3)
+  sigma4 <- 1/N4 * t(X[Z==4, ] - matrix(1, nrow = N4) %*% mu4) %*%(X[Z==4, ] - matrix(1, nrow = N4) %*% mu4)
+
+  Sigma <- list(sigma1, sigma2, sigma3, sigma4)
+  
+  Pi <- c(N1, N2, N3, N4) / sum(N1, N2, N3, N4)
+  
+  Mu <- rbind(mu1, mu2, mu3, mu4)
+  
+  theta <- list(Mu = Mu, Sigma = Sigma, Pi = Pi)
+  
+  return(theta)
+  
+}
+
+
+e_step_hard <- function(x, theta){
+  
+  require(mvtnorm)
+  mu1 <- theta$Mu[1, ]
+  mu2 <- theta$Mu[2, ]
+  mu3 <- theta$Mu[3, ]
+  mu4 <- theta$Mu[4, ]
+  
+  sigma1 <- theta$Sigma[[1]]
+  sigma2 <- theta$Sigma[[2]]
+  sigma3 <- theta$Sigma[[3]]
+  sigma4 <- theta$Sigma[[4]]
+  
+  p1 <- theta$Pi[1]
+  p2 <- theta$Pi[2]
+  p3 <- theta$Pi[3]
+  p4 <- theta$Pi[4]
+  
+
+  z1 <- p1 * apply(X, 1, dmvnorm, mean = mu1, sigma = sigma1)
+  z2 <- p2 * apply(X, 1, dmvnorm, mean = mu2, sigma = sigma2)
+  z3 <- p3 * apply(X, 1, dmvnorm, mean = mu3, sigma = sigma3)
+  z4 <- p4 * apply(X, 1, dmvnorm, mean = mu4, sigma = sigma4)
+  
+  Z <- cbind(z1, z2, z3, z4)
+  Z <- apply(Z, 1, which.max)
+  return(Z)
+  
+}
+
+
+#start_Z <- matrix(rep(diag(1, 4), 250), nrow = 1000, byrow = T)
+start_Z <- init_assignments
+
+EM_hard <- function(x, start_Z, max_iter = 50){
+  
+  m.step.theta <- m_step_hard(X, start_Z)
+  e.step <- e_step_hard(X, theta = m.step.theta)
+  
+  iter <- 1
+  while(iter <= max_iter) {
+    m.step <- m_step_hard(X, e.step)
+    e.step <- e_step_hard(X, m.step.theta)
+    iter <- iter + 1
+  }
+  
+  return(list(Class = e.step,
+              theta = m.step))
+  
+}
+
+EM_hard_results <- EM_hard(X, init_assignments)
+EM_hard_results$theta$Pi
+EM_hard_results$theta$Mu
+
+
+```
+
 \item Now repeat, but take a \textbf{soft} EM approach.  Compare your result to what you found using a hard EM approach.
+
+```{r }
+
+Z <- matrix(runif(4000), ncol = 4)
+Z <- Z / rowSums(Z)
+
+m_step_soft <- function(X, Z){
+  
+  M1 <- sum(Z[ ,1])
+  M2 <- sum(Z[ ,2]) 
+  M3 <- sum(Z[ ,3])
+  M4 <- sum(Z[ ,4])
+  
+  mu1 <- 1/M1 * colSums(Z[,1] * X)
+  mu2 <- 1/M2 * colSums(Z[,2] * X)
+  mu3 <- 1/M3 * colSums(Z[,3] * X)
+  mu4 <- 1/M4 * colSums(Z[,4] * X)
+  
+  obs <- nrow(X)
+  
+  sigma1 <- matrix(0, 20, 20)
+  for (i in 1:1000) {
+    sigma1 <- sigma1 + Z[i,1] * (matrix(X[i,]) - mu1) %*% t(matrix(X[i,]) - mu1)
+  }
+  sigma1 <- sigma1 / M1
+  
+  sigma2 <- matrix(0, 20, 20)
+  for (i in 1:1000) {
+    sigma2 <- sigma2 + Z[i,2] * (matrix(X[i,]) - mu2) %*% t(matrix(X[i,]) - mu2)
+  }
+  sigma2 <- sigma2 / M2
+  
+  sigma3 <- matrix(0, 20, 20)
+  for (i in 1:1000) {
+    sigma3 <- sigma3 + Z[i,3] * (matrix(X[i,]) - mu3) %*% t(matrix(X[i,]) - mu3)
+  }
+  sigma3 <- sigma3 / M3
+  
+  sigma4 <- matrix(0, 20, 20)
+  for (i in 1:1000) {
+    sigma4 <- sigma4 + Z[i,4] * (matrix(X[i,]) - mu4) %*% t(matrix(X[i,]) - mu4)
+  }
+  sigma4 <- sigma4 / M4
+
+  Sigma <- list(sigma1, sigma2, sigma3, sigma4)
+  
+  Pi <- c(M1, M2, M3, M4) / sum(M1, M2, M3, M4)
+  
+  Mu <- rbind(mu1, mu2, mu3, mu4)
+  
+  theta <- list(Mu = Mu, Sigma = Sigma, Pi = Pi)
+  
+  return(theta)
+  
+}
+
+e_step_soft <- function(x, theta){
+  
+  require(mvtnorm)
+  mu1 <- theta$Mu[1, ]
+  mu2 <- theta$Mu[2, ]
+  mu3 <- theta$Mu[3, ]
+  mu4 <- theta$Mu[4, ]
+  
+  sigma1 <- theta$Sigma[[1]]
+  sigma2 <- theta$Sigma[[2]]
+  sigma3 <- theta$Sigma[[3]]
+  sigma4 <- theta$Sigma[[4]]
+  
+  p1 <- theta$Pi[1]
+  p2 <- theta$Pi[2]
+  p3 <- theta$Pi[3]
+  p4 <- theta$Pi[4]
+  
+
+  z1 <- p1 * apply(X, 1, dmvnorm, mean = mu1, sigma = sigma1)
+  z2 <- p2 * apply(X, 1, dmvnorm, mean = mu2, sigma = sigma2)
+  z3 <- p3 * apply(X, 1, dmvnorm, mean = mu3, sigma = sigma3)
+  z4 <- p4 * apply(X, 1, dmvnorm, mean = mu4, sigma = sigma4)
+  
+  Z <- cbind(z1, z2, z3, z4) / rowSums(cbind(z1, z2, z3, z4))
+  
+  return(Z)
+  
+}
+
+init_Z <- Z
+EM_soft <- function(X, init_Z, max_iter = 50, epsilon = 1e-3){
+  
+  # init_theta <- init_theta %>%
+  #   setNames(c("mu1", "mu2", "s1", "s2", "p1", "p2"))
+  
+  for (i in 1:max_iter) {
+    if (i == 1) {
+      # Initialization
+      m.step <- m_step_soft(X, init_Z)
+      e.step <- e_step_soft(X, m.step)
+      #cur.loglik <- e.step[["loglik"]]
+      #loglik.vector <- e.step[["loglik"]]
+    } else {
+      # Repeat E and M steps till convergence
+      m.step <- m_step_soft(X, e.step)
+      e.step <- e_step_soft(X, m.step)
+      #loglik.vector <- c(loglik.vector, e.step[["loglik"]])
+      
+      #loglik.diff <- abs((cur.loglik - e.step[["loglik"]]))
+      # if(loglik.diff < epsilon) {
+      #   break
+      # } else {
+      #   cur.loglik <- e.step[["loglik"]]
+      # }
+    }
+  }
+  
+  return(list(
+    theta = m.step,
+    #logL_history = loglik.vector,
+    probs = e.step
+  ))
+}
+
+EM_soft_results <- EM_soft(X, init_Z = init_Z)
+
+EM_soft_results$theta$Pi
+EM_hard_results$theta$Pi
+
+EM_soft_results$theta$Mu
+EM_hard_results$theta$Mu
+
+```
+
+
 \end{enumerate}
 
 
@@ -312,7 +604,7 @@ is_hardcore <- function(W){
 
 set.seed(123)
 iteration = 1
-while (iteration <= 250000) {
+while (iteration <= 50000) {
   
   i <- runif(1, 1, 100) %>% round()
   j <- runif(1, 1, 100) %>% round()
@@ -327,15 +619,15 @@ while (iteration <= 250000) {
   
   if(HardCore){
     X <- w
-    last_HC <- iteration
-  }
-  if(iteration - last_HC >= 100){
-    w <- X
-    w[sample(1:100, 5), sample(1:100, 5)] = 0}
-  
+    #last_HC <- iteration
+  }else{w <- X}
+  # if(iteration - last_HC >= 100){
+  #   w <- X
+  #   w[sample(1:100, 3), sample(1:100, 3)] = 0}
+  # 
   f_X <- rbind(f_X, c(sum(X), iteration))
   if(iteration %% 10000 == 0){image(X)}
-  if(iteration %% 5000 == 0){print(iteration)}
+  #if(iteration %% 5000 == 0){print(iteration)}
   
   iteration <- iteration + 1
   
@@ -355,10 +647,9 @@ f_X %>% as.data.frame() %>% ggplot(aes(x = V2, y = V1)) + geom_line()
 MHHardcoreAlgo <- function(iterations){
   
   w <- matrix(0, nrow = 100, ncol = 100)
-  X_0 <- w
-  X <- X_0
+  X <- w
   
-  #f_X <- matrix(c(sum(X_0), 0), ncol = 2)
+  f_X <- sum(X)
   
   is_hardcore <- function(W){
     
@@ -392,28 +683,30 @@ MHHardcoreAlgo <- function(iterations){
     
     if(HardCore){
       X <- w
-      last_HC <- iter
-    }
-    if(iter - last_HC >= 100){
-      w <- X
-      w[sample(1:100, 4), sample(1:100, 4)] = 0}
+    }else{w <- X}
     
-    #f_X <- rbind(f_X, c(sum(X), iter))
+    f_X <- c(f_X, sum(X))
     
     iter <- iter + 1
     
   }
   
-  return(sum(X))
+  samples <- f_X[seq(30000, iterations, 1000)]
+  
+  return(samples)
 }
 
 library(parallel)
 cl <- parallel::makeCluster(detectCores() - 1)
-f_X_dist <- parSapply(cl = cl, X = rep(60000, 100), FUN = MHHardcoreAlgo)
+f_X_dist <- parSapply(cl = cl, X = rep(100000, 11), FUN = MHHardcoreAlgo)
 stopCluster(cl)
 
-ggplot(data.frame(fX = f_X_dist), aes(x = fX/100^2)) +
-  geom_histogram()
+f_X <- data.frame(fX = c(f_X_dist[,1], f_X_dist[,2], f_X_dist[,3], f_X_dist[,4] ,f_X_dist[,5], f_X_dist[,6] ,f_X_dist[,7],
+                         f_X_dist[,8], f_X_dist[,9], f_X_dist[,10], f_X_dist[,11]))
+
+ggplot(f_X, aes(x = fX/100^2)) +
+  geom_histogram(color = "red", fill = "green") +
+  theme_bw() 
 
 ```
 
@@ -421,12 +714,74 @@ ggplot(data.frame(fX = f_X_dist), aes(x = fX/100^2)) +
 \item Let $Y$ be the r.v. on $\Omega$ defined by $P(Y = w) = \alpha (f(w))^2$, where $\alpha$ is a normalizing constant that makes the probabilities sum to $1$.   Use your sampler to generate a histogram for $f(Y)/100^2$.  Compare to part a).
 \end{enumerate}
 
-%\item Suppose we would like to sample the r.v. $X$, where $X \in \{1,2,3\}$ and $P(X = i) = v_i$ for $i=1,2,3$ and where $v = (v_1, v_2, v_3) = (1/2, 1/3, 1/6)$.  
-%\begin{enumerate}
-%\item Write a function to do this using a single draw from a uniform r.v.  You may not use your languages discrete random sampler (e.g. sample or sample.int in R).  We discussed how to do this at the very beginning of the semester.
-%\item Now use the Metropolis-Hastings algorithm to write a sampler for $X$.   Given that we are in state $i$, let the proposal be $1$ with probability $.99$, $2$ with probability $.009$ and $3$ with probability $.001$.  (Notice, in this case the proposal doesn't depend on the current state, but this is not always the case.)   Write a function in R/Python to implement the Metropolis-Hastings algorithm.   Your function simulates a Markov chain, write down the transition probability matrix of the markov chain.  (Typically, we don't write this matrix down, but in this simple setting it is a good exercise.).   How long do you have to run the chain to be close to the stationary distribution?   
+for the MH acceptance step, where we accept with probability $\min(1, \frac{v_{\omega'}R_{\omega'\omega}}{v_{\omega}R_{\omega\omega'}})$, $R_{\omega'\omega} = R_{\omega\omega'} = 1/100^2$,
+so the MH acceptance becomes $\min(1, \frac{v_{\omega'}}{v_\omega}) = \min(1, \frac{\alpha f(\omega')^2}{\alpha f(\omega)^2})= \min(1, \frac{f(\omega')^2}{f(\omega)^2})$
 
-\end{enumerate}
+
+
+```{r }
+
+MHAlgo <- function(iterations){
+  
+  w <- matrix(0, nrow = 100, ncol = 100)
+  w[1,1] = 1
+  Y <- w
+  
+  f_Y <- sum(Y)
+  
+  
+  iter = 1
+  while (iter <= iterations) {
+    
+    i <- round(runif(1, 1, 100))
+    j <- round(runif(1, 1, 100))
+    
+    if(w[i,j] == 0){
+      w[i,j] = 1
+    }else{
+      w[i,j] = 0
+    }
+    
+    U <- runif(1)
+    
+    if(U < min(1, (sum(w)^2 / sum(Y)^2))){
+      Y <- w
+    }else{w <- Y}
+    
+    f_Y <- c(f_Y, sum(Y))
+    
+    iter <- iter + 1
+    
+  }
+  
+  samples <- f_Y[seq(40000, iterations, 1000)]
+  
+  return(samples)
+}
+
+cl <- parallel::makeCluster(detectCores() - 1)
+f_Y_dist <- parSapply(cl = cl, X = rep(200000, 11), FUN = MHAlgo)
+stopCluster(cl)
+
+f_Y <- data.frame(fY = c(f_Y_dist[,1], f_Y_dist[,2], f_Y_dist[,3], f_Y_dist[,4] ,f_Y_dist[,5], f_Y_dist[,6] ,f_Y_dist[,7],
+                         f_Y_dist[,8], f_Y_dist[,9], f_Y_dist[,10], f_Y_dist[,11]))
+
+ggplot(f_Y, aes(x = fY/100^2)) +
+  geom_histogram(color = "green", fill = "red") +
+  theme_bw() 
+
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
 
