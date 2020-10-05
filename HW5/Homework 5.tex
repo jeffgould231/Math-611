@@ -1,0 +1,100 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath, amsthm, verbatim}
+
+\begin{document}
+
+
+\renewcommand{\a}{\textbf{a}}
+\renewcommand{\b}{\textbf{b}}
+\renewcommand{\d}{\textbf{d}}
+\newcommand{\e}{\textbf{e}}
+
+\renewcommand{\Xi}{X^{(i)}}
+\newcommand{\Yi}{\hat{Y}_i}
+\newcommand{\hS}{\hat{\Sigma}}
+
+\large
+
+\begin{center}
+\textbf{Homework \# 5} \\  
+\end{center}
+
+\medskip
+
+
+\medskip
+
+Reading (optional)
+\begin{itemize}
+\item Section $9.4$ discusses the general theory of EM and covers the material I discussed in the lecture.
+\item Setion $12.1$ discusses PCA.
+\end{itemize}
+
+\begin{enumerate} 
+
+% hw 4, fall 2019
+\item In this problem, we will once again revisit the Hope heights problem of HW $3$, but this time we will use the formal notation of EM.  Recall, we consider the two component Gaussian mixture model,
+\begin{equation}
+X = \bigg\{
+\begin{array}{cc}
+\mathcal{N}(\mu_1, \sigma_1^2) & \text{ with probability } p_1 \\
+\mathcal{N}(\mu_2, \sigma_2^2) & \text{ with probability } p_2
+\end{array}
+\end{equation}
+where $\mathcal{N}(\mu, \sigma^2)$ is the normal distribution and $X$ models the height of a person when gender is unknown.  Let $\theta = (\mu_1, \mu_2, \sigma_1^2, \sigma_2^2, p_1, p_2)$.   Let $\hat{X}_1, \hat{X}_2,\dots, \hat{X}_N$ be the sample heights given in the file.  
+\begin{enumerate}
+\item Recall that to implement EM we define 
+\begin{equation}
+Q(\theta, \theta') = \sum_{i=1}^N E_\theta[\log P(\hat{X}_i, z_i \ | \ \theta')],
+\end{equation}
+where $z_i$ is either $1$ or $2$ and determines the mixture $\hat{X}_i$ was sampled from and the $\theta$ subscript in the expectation means that we take the expectation with the $z_i$ distributed according to $\theta$.  Write down an expression for $Q(\theta, \theta')$ using $r_{i1} = P(z_i=1 \ | \ \hat{X}_i, \theta)$, $r_{i2} = P(z_i = 2 \ | \ \hat{X}_i, \theta)$ and the pdfs of the normals.  Then give a formula for $r_{i1}$ and $r_{i2}$ in terms of $\theta$ and the $\hat{X}_i$.
+\item Compute $\text{argmax}_{\theta'} Q(\theta, \theta')$.   You should derive an expression for each entry of $\theta'$ by solve $\nabla_{\theta'} Q(\theta,\theta') = 0$.   Hint:  To compute that values of $p_1'$ and $p_2'$ for $\theta'$, you can either use a Lagrange multiplier approach, with the constraint $p_1' + p_2' = 1$ or you can simply substitute $p_2' = 1 - p_1'$.
+\item  Compare your updates for the parameters to the heuristic updates of soft EM.
+\end{enumerate}
+
+% hw 4, fall 2019
+\item See the attached section $9.3.3$ from Bishop for a definition and discussion of Bernoulli mixture models.  Let $X$ represent $10$ bits, i.e. $X = (X_1, X_2, \dots, X_{10})$ where each coordinate of $X$ is either $0$ or $1$.  Assume the following Bernoulli mixture model for the $ith$ coordinate of $X$, $X_i$:
+\begin{equation}
+X_i = \bigg\{
+\begin{array}{cc}
+\text{Bernoulli}(\mu^{(1)}_i) & \text{ with probability } p_1 \\
+\text{Bernoulli}(\mu^{(2)}_i) & \text{ with probability } p_2,
+\end{array}
+\end{equation}
+where $\mu^{(1)}, \mu^{(2)} \in \mathbb{R}^{10}$ with all coordinates in $[0,1]$.  Assume further that the coordinates of $X$ are always sampled from the same mixture, with probabilities $p_1$ and $p_2$ for mixture $1$ and $2$ respectively, but that the Bernoulli draw of each coordinate is independent.  
+\begin{enumerate}
+\item Write down an EM iteration for this mixture model.  
+\item Attached is the file \verb+noisy_bits.csv+ which contains a $500 \times 10$ matrix.  Each row of the matrix is a sample of $X$.   If you look at an image of the matrix (in R use \textbf{image} on the transposed matrix), you will see that there are two patterns, but with some noise added.   Use your EM algorithm to fit the mixture model to the data.  Does your fit recover the two underlying patterns?
+\end{enumerate}
+
+% hw 7, fall 2019
+\item This problem focuses on the computations involved in deriving the PCA.  Consider the dataset formed by  $\Xi \in \mathbb{R}^n$ for $i=1,2,\dots,N$.   Set $\mu = 1/N \sum_{i=1}^n \Xi$.
+\begin{enumerate}
+\item Let $a,b \in \mathbb{R}^n$ be column vectors.  Show in any way you like - by proof, through example, by intuitive explanation - that $(a \cdot b)^2 = a^T M a$ where $M$ is an $n \times n$ matrix given by $M = bb^T$.
+\item Let $\hS$ be the covariance matrix of the data.  Then, by definition 
+\begin{equation}
+\hS_{jk} = \frac{1}{N} \sum_{i=1}^N (\Xi_j - \mu_j)(\Xi_k - \mu_k)
+\end{equation}
+Show that $\hS$ can also be written in the following two forms
+\begin{itemize}
+\item   Let $\tilde{X}$ be the $N \times n$ matrix with the $\Xi - \mu$ as the rows
+\begin{equation}
+\hS = \frac{1}{N} \tilde{X}^T \tilde{X}
+\end{equation}
+\item Thinking of the $\Xi$ as column vectors,
+\begin{equation}
+\hS = \frac{1}{N} \sum_{i=1}^N (\Xi - \mu) (\Xi - \mu)^T
+\end{equation}
+\end{itemize}
+\item The 1-d PCA involves the parameters $\mu$, $w^{(1)}$ and $c_i \in \mathbb{R}$ for $i=1,2,\dots,N$ that are used to approximate $\Xi$ according to
+\begin{equation}
+\Xi \approx \mu + c_i w^{(1)}.
+\end{equation}
+Derive the values of $c_i$ and $w^{(1)}$ that optimize this approximation.  (We did this in class.)  Then, compute the mean and variance of the $c_i$.  
+\end{enumerate}
+
+\end{enumerate}
+
+
+\end{document}
