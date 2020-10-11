@@ -1,0 +1,53 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath, amsthm, verbatim}
+
+\begin{document}
+
+
+\renewcommand{\a}{\textbf{a}}
+\renewcommand{\b}{\textbf{b}}
+\renewcommand{\d}{\textbf{d}}
+\newcommand{\e}{\textbf{e}}
+
+\large
+
+\begin{center}
+\textbf{Homework \# 6} \\  
+\end{center}
+
+\medskip
+
+
+\medskip
+
+
+\renewcommand{\Xi}{X^{(i)}}
+\newcommand{\Yi}{\hat{Y}_i}
+\newcommand{\hS}{\hat{\Sigma}}
+
+Reading
+\begin{itemize}
+\item Attached you will find an article by Persi Diaconis, \textit{The MCMC Revolution} published in 2009 at the height of the MCMC euphoria.  The article touches on many of the ideas we have discussed and provides some interesting examples.
+\end{itemize}
+
+\begin{enumerate} 
+
+% Fall 2019, hw 7, problem 2
+\item Attached you will find the files \verb+TimeSeries2.csv+, \verb+TimeSeries3.csv+, \verb+TimeSeries4.csv+.  Each of these files contains a $1000 \times 20$ matrix constructed in the same way as the time series dataset from hw $4$.   The difference is that \verb+TimeSeries2.csv+ contains only two base times series, while \verb+TimeSeries3.csv+ and \verb+TimeSeries4.csv+ contain $3$ and $4$ base time series, respectively.  
+\begin{enumerate}
+\item Before doing any computations, decide what might be the best dimension $K$ to use for a PCA in approximating each of these three datasets.   Explain your reasoning.  (No wrong answer here.  I just want you to think things through.)
+\item For each of the three data files do the following.  
+\begin{enumerate}
+\item Compute the eigenvalues of the covariance matrix.  Then, plot the fraction of the dataset's variance captured by a $K$-dimensional PCA for $K=1,2,\dots,20$.  Discuss how the fraction of variance captured as $K$ varies reflects  the number of base time series.  
+\item Use a 2-d PCA to reduce the dimensionality of the data and then produce a plot of the $1000$ data points.   (In a 2-d PCA each $\Xi$ corresponds to a $(c^{(i)}_1, c^{(i)}_2)$.  Plot the $c^{(i)}$).  Do the data points separate into the appropriate number of clusters?   
+\item For the 2-d PCA, compute the correlation between $c^{(i)}_1$ and $c^{(i)}_2$ for $i=1,2,\dots,1000$.   Then compute the variance of $c^{(i)}_1$ and the variance of $c^{(i)}_2$ and relate to the eigenvalues you computed in (a).
+\end{enumerate}
+In answering (i)-(ii), do not use R or Python's pca function(s).  Instead compute the PCA yourself.  You can call R's \textbf{eigen} function and the Python equivalent.
+\end{enumerate}
+
+% New problem
+\item Suppose we roll $100$ dice and the sum of the die rolls is $450$.  Use an MCMC approach to determine (i) the expected number of $6$'s rolled (ii) the expected number of $1$'s rolled and (iii) the probability that we roll less than thirty $1$'s.  Do all of these using a single run of a Markov chain.  Be sure to include a burn-in time and run you chain for a sufficient length of time.
+\end{enumerate}
+
+\end{document}
