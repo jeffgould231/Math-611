@@ -1,0 +1,127 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath, amsthm, verbatim}
+
+\begin{document}
+
+
+\renewcommand{\a}{\textbf{a}}
+\renewcommand{\b}{\textbf{b}}
+\renewcommand{\d}{\textbf{d}}
+\newcommand{\e}{\textbf{e}}
+
+\large
+
+\begin{center}
+\textbf{Homework \# 8} \\  
+\end{center}
+
+
+
+\medskip
+
+
+\newcommand{\normal}{\mathcal{N}}
+
+Reading
+\begin{itemize}
+\item Section $13.2$ introduces hidden Markov models.  The previous section, $13.1$, discuss Markov chains and similar models of sequential random variables.  In problem $1$ below, we use $X(t)$ as the hidden state.  Bishop instead uses $Z$ for the hidden state, following the notation for EM, which we will also pick up next week.
+\item I've attached the original diffusion maps paper by Coifman and Lafon.  The wikipedia article on diffusion maps follows the Coifman and Lafon paper closely and is worth reading,
+\begin{verbatim}
+https://en.wikipedia.org/wiki/Diffusion_map
+\end{verbatim}
+\end{itemize}
+
+\vspace{.5cm}
+
+\begin{enumerate} 
+
+% Fall 2019, hw 9, problem 1
+\item (This problem is based on the cheating-casino hidden Markov model we discussed in class.)  Let $X(t)$ be a Markov chain on the state space $\{F,C\}$ (F - fair, C - cheating).  Suppose that $X(t)$ changes state with probability $\alpha = .05$ regardless of its current state.   Let $Y(t)$ be a r.v. with values from $\{1,2,3,4,5,6\}$.  ($Y(t)$ corresponds to the $t$-th role of a die).     If $X(t) = F$ then $Y(t)$ is uniformly distributed on $\{1,2,3,4,5,6\}$ (a fair die).  If $X(t) = C$ then $P(Y(t) = 6) = 1/50$ and all values for $Y(t)$ are equally likely.   Assume $X(0) = F$ where $\pi$ is the stationary distribution of $X(t)$.  
+\begin{enumerate}
+\item Write a function, \textbf{SampleCasino(T)} that samples $X(t)$, $Y(t)$ for $t \le T$.
+\item Use your simulation from part (a) to produce a single realization of $X(t)$ and $Y(t)$ up to time step $T=200$.   Pretend that you don't know the $X(t)$ values, but that you know the $Y(t)$ values generated. Let $(j_0, j_1, \dots, j_T)$ be the sequence of $Y(t)$ values you generated. Given a sequence $(i_0, i_1, \dots, i_T)$ of states $i \in \{F,C\}$, write an expression for the probability,
+\begin{align}  \label{E:1}
+P(X(0) = i_0, X(1) = i_1, \dots,& X(T) = i_T \ | \ Y(0) = j_0, 
+\\ \notag
+	& Y(1) = j_1, \dots, Y(T) = j_T)
+\end{align}
+Set $\alpha = P(Y(0) = j_0, Y(1) = j_1,\dots, Y(T) = j_T)$.  Your expression for (\ref{E:1}) should be a function of $\alpha$ and the $i_s$, $j_s$ for $s=0,1,2,\dots,T$. Provide an expression for $\alpha$ (you can express $\alpha$ through $T+1$ sums).
+\item Let $\nu(i_0, i_1, \dots, i_T)$ be the conditional probability given in (\ref{E:1}).  Let $Z$ be the r.v. with distribution $\nu$.  What is the state space of $Z$?  (We discussed this in class.)
+\item Using a Metropolis-Hastings approach, construct a Markov chain $W(s)$ that has $Z$ as its stationary distribution.  (Here I'll use $s$ as the time variable so as not to confuse it with the $t$ variable of $X(t)$).    Use your sampler to estimate $P(X(t) = C \ | \ Y(0) = j_0, Y(1) = j_1,\dots, Y(T) = j_T)$ where $t$ is a given value.  Using a single long run of $W(s)$, estimate $P(X(t) = C \ | \ Y(0) = j_0, Y(1) = j_1,\dots, Y(T) = j_T)$, don't forget to include a burn-in time.  Do this for all $t \le 200$. You can use a single long run of $W(s)$ for each value of $t$.  Plot $P(X(t) = C \ | \ Y(0) = j_0, Y(1) = j_1,\dots, Y(T) = j_T)$ as a function of $t$ and compare the probabilities you computed to the actual state of the casino.
+\end{enumerate}
+
+%\item This problem covers the derivation of diffusion maps.  Suppose we are given $N$ data points $x^{(1)}$, $x^{(2)}$,...,$x^{(N)}$ with each $x^{(i)} \in \mathbb{R}^n$.  For $x,y \in \mathbb{R}^n$, let $k(x,y)$ be a kernel function defined by $k(x,y) : \mathbb{R}^n \times \mathbb{R}^n \to \mathbb{R}$ with $k(x,y) = k(y,x) \ge 0$.  Define the $N \times N$ matrix $K$ through $K_{ij} = k(x^{(i)}, x^{(j)})$.  Let $d_i = \sum_{j=1}^N K_{ij}$, the sum of the $ith$ row of $K$.  Let $A_{ij} = K_{ij}/d_i$.   (Compare to section $2.1$ of the diffusion map paper.   The authors use a notation of integration over a measure $\mu(x)$, but for data samples this is the same as replacing the integrals with sums.  Their $p(x,y)$ is our $A$. ).  Take $A$ as the transition probability matrix on a state space $\{1,2,\dots,N\}$ or equivalently on the data points $\{x^{(1)}, x^{(2)}, \dots, x^{(N)}\}$, where we think of the data points as categorical variables.  Let $Z(t)$ be the Markov chain defined by $A$.
+%\begin{enumerate}
+%\item Show that the stationary distribution of $Z(t)$ satisifes 
+%\begin{equation}
+%\pi(x^{(i)}) = \frac{d_i}{\sum_{j=1}^N d_j}
+%\end{equation}
+%\item Let $D$ be the $N \times N$ diagonal matrix with the $i$th diagonal entry given by $d_i$.  Show that $D^{1/2} A D^{-1/2}$ is a symetric matrix and can be written in terms of its eigenvalues and eigenvectors as $D^{1/2} A D^{-1/2} = \sum_{i=1}^N \lambda_i q^{(i)} q^{(i)}$.  (Compare to  Appendix A, top of page $21$.  The authors $\phi_i$ is our $q^{(i)}$ and their $a(x,y)$ corresponds to $D^{1/2} A D^{-1/2}$.)
+%\item Show that $A = \sum_{i=1}^N \lambda_i r^{(i)} (\ell^{(i)})^T$ where $r^{(i)} = D^{-1/2} q^{(i)}$ and $\ell^{(i)} = D^{1/2} q^{(i)}$.  Show that $r^{(i)}$ and $\ell^{(i)}$ are right and left eigenvectors of $A$.
+%\item The authors introduce the diffusion distance between the data points $x^{(i)}$, $x^{(j)}$,
+%\begin{align}
+%D_t^2(x^{(i)},x^{(j)}) = \sum_{k=1}^N \bigg[ (P &(Z(t) = x^{(k)} \ |  \ Z(0) = x^{(i)}) 
+%\\ \notag &
+%- P(Z(t) = x^{(k)} \ | \ Z(0) = x^{(j)} \bigg]^2 \frac{1}{\pi(x^{(k)}} 
+%\end{align}
+%Explain the intuition behind this distance.  What does it do that the Euclidean distance $\|x^{(i)} - x^{(j)}\|^2$ does not?  A few sentences is all that's needed.
+%\item The authors describe a mapping from $x^{(i)} \in \mathbb{R}^n$ to $y^{(i)} \in \mathbb{R}^N$, where $y^{(i(}$ is given by 
+%\begin{equation}
+%y^{(i)} = \left(
+%\begin{array}{c}
+%\lambda_1 r^{(1}_i \\
+%\lambda_2 r^{(2)}_i \\
+%\vdots
+%\lambda_N r^{(N)}_i
+%\end{array}
+%\right)
+%\end{equation}
+%What is the formula for $D_t^2(x^{(i)}, x^{(j)})$ in terms of $y^{(i)}, y^{(j)}$?   You don't need to derive the formula, just state it.  (I derive this formula in the Lecture and it is given in the paper as their Proposition $1$.)
+%\item Describe how we would use diffusion maps to dimensionally reduce the data to $\mathbb{R}^m$ where $m \ll n$.   
+%\end{enumerate}
+
+\item Attached you will find a R script \verb+make_1d_manifold.R+ that constructs data points $x^{(i)} \in \mathbb{R}^{10}$ for $i=1,2,\dots,500$ that are localized around a $1$-d manifold.   The data points produced by the script are in \verb+diffusion_maps_data.csv+.
+\begin{enumerate}
+\item Look at the file \verb+diffusion_maps_data.csv+.  The data points are given in the first $10$ columns.  The $11$th column gives a parameter $\beta$ discussed in the next subproblem.   Can you find a pattern in the data?  (The answer will be no, I think.)
+\item Read the script and describe what the $1$-d manifold looks like.  Associated with each data point is a scalar $\beta \in [0,1]$.  Explain how $\beta$ paramatrizes the manifold.
+\item Reduce the data to $\mathbb{R}^2$ and $\mathbb{R}$ using PCA.  Plot the data points in the reduced dimension and use color to represent the value of $\beta$.  
+\item
+
+\begin{enumerate}
+\item The authors of the diffusion maps paper (see Reading above) introduce the diffusion distance between the data points $x^{(i)}$, $x^{(j)}$,
+\begin{align}
+D_t^2(x^{(i)},x^{(j)}) = \sum_{k=1}^N \bigg[ (P &(Z(t) = x^{(k)} \ |  \ Z(0) = x^{(i)}) 
+\\ \notag &
+- P(Z(t) = x^{(k)} \ | \ Z(0) = x^{(j)} \bigg]^2 \frac{1}{\pi(x^{(k)})} 
+\end{align}
+Explain the intuition behind this distance.  How is $Z(t)$ constructed?  What is $\pi$?   Here I'm not looking for any proofs or derivations.  Just explain your understanding of the construction.
+\item The authors describe a mapping from $x^{(i)} \in \mathbb{R}^n$ to $y^{(i)} \in \mathbb{R}^N$, where $y^{(i)}$ is given by 
+\begin{equation}
+y^{(i)} = \left(
+\begin{array}{c}
+\lambda_1^t r^{(1)}_i \\
+\lambda_2^t r^{(2)}_i \\
+\vdots \\
+\lambda_N^t r^{(N)}_i
+\end{array}
+\right)
+\end{equation}
+Explain how to compute the $\lambda$ and $r$.
+What is the formula for $D_t^2(x^{(i)}, x^{(j)})$ in terms of $y^{(i)}, y^{(j)}$?   Again, I'm not looking for proofs or step-by-step derivations.  Just show my how you would do the computations and state the formula.  (The lecture video  and paper provide step by step derivations.)
+\item Describe how we would use diffusion maps to dimensionally reduce the data.
+\item Now repeat $(c)$, but use diffusion maps to dimensionally reduce the data.  Experiment with different kernels and different time parameters $t$ in the diffusion maps.  
+
+\end{enumerate}
+\end{enumerate}
+
+
+
+
+
+
+\end{enumerate}
+
+
+
+\end{document}
