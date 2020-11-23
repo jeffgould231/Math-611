@@ -374,9 +374,13 @@ summary {
 <p>Consider the queue model discussed in class (i.e. a single server model). As in class, assume that the interarrival times, <span class="math inline">\(T_i\)</span> are iid as are the service times <span class="math inline">\(V_i\)</span>. Assume further that each <span class="math inline">\(T_i\)</span> is exponentially distributed with rate <span class="math inline">\(\lambda\)</span> and each <span class="math inline">\(V_i\)</span> is exponentially distributed with rate <span class="math inline">\(\mu\)</span>. Let <span class="math inline">\(X(t)\)</span> be the number of customers waiting in line at time <span class="math inline">\(t\)</span>. Let <span class="math inline">\(W_i\)</span> be the waiting time of the <span class="math inline">\(i\)</span>th individual. Assume that initially the queue is empty, so <span class="math inline">\(X(0) = 0\)</span> and <span class="math inline">\(W_1 = 0\)</span>.</p>
 <div id="a-determine-pw_2-ge-c-for-c-a-positive-number.-write-down-an-integral-and-evaluate-it-you-wont-need-a-computer." class="section level4">
 <h4>a) Determine <span class="math inline">\(P(W_2 \ge c)\)</span> for <span class="math inline">\(c\)</span> a positive number. (write down an integral and evaluate it, you won’t need a computer).</h4>
+<p><span class="math inline">\(P(W_2 \ge c) = P(\max(0,D_1 - A_2) \ge c) = P((T_1 + V_1) - (T_1+T_2) \ge c =\)</span></p>
+<p><span class="math inline">\(P(V_1 - T_2 \ge c) = P(V_1 \ge c + t_2) = \int_0^{\infty}\int_{c + t_2}^{\infty}\mu e^{-\mu v}\lambda e^{-\lambda t}dvdt = \int_0^{\infty}\lambda e^{-\lambda t}\left[-e^{-\mu v}\right]_{c+t_2}^{\infty}dt = \int_0^{\infty}\lambda e^{-\lambda t}e^{-\mu(c+t_2)}dt =\)</span></p>
+<p><span class="math inline">\(e^{-\mu c}\int_0^{\infty}\lambda e^{-\lambda t}e^{-\mu t}dt = -\frac{e^{-\mu c}\lambda \left[e^{(-\lambda - \mu)t} \right]_0^{\infty}}{\lambda + \mu} = \frac{\lambda e^{-\mu c}}{\lambda + \mu}\)</span></p>
 </div>
 <div id="b-write-down-an-integral-expression-for-pw_3-ge-c-you-dont-need-to-evaluate-the-integral-unless-you-want-to.-your-answer-may-be-the-sum-of-two-integrals." class="section level4">
 <h4>b) Write down an integral expression for <span class="math inline">\(P(W_3 \ge c)\)</span> (You don’t need to evaluate the integral, unless you want to. Your answer may be the sum of two integrals.)</h4>
+<p><span class="math inline">\(P(W_3 &gt; c) = P(\max(\)</span></p>
 </div>
 <div id="c-write-a-function-waitingtimesn-lambda-mu-that-samples-the-waiting-times-of-the-first-n-customers.-your-function-should-return-a-vector-of-length-n-with-the-sampled-waiting-time.-show-the-output-of-your-function-for-n10-lambda1-mu1." class="section level4">
 <h4>c) Write a function WaitingTimes(n <span class="math inline">\(\lambda\)</span>, <span class="math inline">\(\mu\)</span>) that samples the waiting times of the first <span class="math inline">\(n\)</span> customers. Your function should return a vector of length <span class="math inline">\(n\)</span> with the sampled waiting time. Show the output of your function for <span class="math inline">\(n=10, \lambda=1, \mu=1\)</span>.</h4>
@@ -443,28 +447,19 @@ plotQueue &lt;- function(t, lambda, mu){
     D[i] &lt;- A[i] + W[i] + V[i]
   }
   
-  steps &lt;- sort(c(0,A,D))
-  steps &lt;- steps[steps &lt;= t]
-  
-  inqueue &lt;- function(Arrival, Departure, time){
-    return(
-      if(Arrival &lt;= time &amp; time &lt; Departure){1}else{0}
-    )
+  X &lt;- data.frame(
+    steps = c(0,A,D),
+    count = c(0, rep(1, length(A)), rep(-1, length(D)))  ### Add 1 if arrival, subtract 1 if departure
+  ) %&gt;% 
+    arrange(steps) %&gt;% ## Put events in chronological order
+    filter(steps &lt;= t) %&gt;% ### remove departures after t
+    mutate(in_queue = cumsum(count))
     
-  }
-  
-  Xt &lt;- sum(mapply(inqueue, A,D, time = steps[1]))
-  for (j in 2:length(steps)) {
-    Xt[j] = sum(mapply(inqueue, A,D, time = steps[j]))
-  }
-  
-  X &lt;- data.frame(steps, Xt)
-    
-  ggplot(X, aes(x = steps, y = Xt)) +
+  ggplot(X, aes(x = steps, y = in_queue)) +
     geom_step() +
     theme_bw() +
     labs(x = &quot;Time&quot;, y = &quot;In queue [X(t)]&quot;) +
-    scale_y_continuous(breaks = seq(0,max(X$Xt) + 2, 2))
+    scale_y_continuous(breaks = seq(0,max(X$in_queue) + 2, 2))
   
 }
 
@@ -477,25 +472,43 @@ plotQueue(20,1,1)</code></pre>
 <p>Let <span class="math inline">\(N = 100000\)</span></p>
 <pre class="r"><code>set.seed(123)
 N &lt;- 100000
-#cl &lt;- parallel::detectCores()
 cl &lt;- parallel::makeCluster(parallel::detectCores() - 1)
 
 WaitTimes &lt;- t(parallel::parSapply(cl, X = rep(2, N), FUN = waitingTimes, lambda = 1, mu = 1))
 
-P &lt;- mean(WaitTimes[,2] &gt;=1)
-#parallel::stopCluster(cl)</code></pre>
-<p>Runing the above, we find that the probabilty the second customer has to wait in line more than <span class="math inline">\(1\)</span> time unit is 0.18419</p>
+P &lt;- mean(WaitTimes[,2] &gt;=1)</code></pre>
+<p>Runing the above, we find that the probabilty the second customer has to wait in line more than <span class="math inline">\(1\)</span> time unit is 0.18353</p>
+<p>Compared with our answer from 2b: <span class="math inline">\(\frac{\lambda e^{-\mu c}}{\lambda + \mu} = \frac{1 e^{-1\cdot 1}}{1 + 1} = 0.18394\)</span></p>
 <p>We follow the same process for <span class="math inline">\(W_{100}\)</span>, simply expand <code>n</code> in <code>waitingTimes</code> to 100 instead of 2</p>
 <pre class="r"><code>set.seed(123)
 N &lt;- 100000
-#cl &lt;- parallel::detectCores()
-#cl &lt;- parallel::makeCluster(parallel::detectCores() - 1)
 
 WaitTimes &lt;- t(parallel::parSapply(cl, X = rep(100, N), FUN = waitingTimes, lambda = 1, mu = 1))
 
 P &lt;- mean(WaitTimes[,100] &gt;=1)
 parallel::stopCluster(cl)</code></pre>
-<p>Runing the above, we find that the probabilty the <span class="math inline">\(100^{th}\)</span> customer has to wait in line more than <span class="math inline">\(1\)</span> time unit is 0.88769</p>
+<p>Runing the above, we find that the probabilty the <span class="math inline">\(100^{th}\)</span> customer has to wait in line more than <span class="math inline">\(1\)</span> time unit is 0.88688</p>
+</div>
+</div>
+<div id="let-x-be-a-multivariate-normal-x-sim-mathcalnmu-sigma." class="section level3">
+<h3>3 Let <span class="math inline">\(X\)</span> be a multivariate normal, <span class="math inline">\(X \sim \mathcal{N}(\mu, \Sigma)\)</span>.</h3>
+<div id="a-show-that-the-coordinates-of-x-are-independent-if-and-only-if-sigma-is-diagonal.-hint-recall-how-the-joint-pdf-and-marginal-pdfs-relate-for-independent-r.v." class="section level4">
+<h4>a) Show that the coordinates of <span class="math inline">\(X\)</span> are independent if and only if <span class="math inline">\(\Sigma\)</span> is diagonal. (Hint: recall how the joint pdf and marginal pdfs relate for independent r.v.)</h4>
+<p>“<span class="math inline">\(\Rightarrow\)</span>” Suppose the coordinates of <span class="math inline">\(X\)</span> are independent, <span class="math inline">\(x_i \sim N(\mu_i,\sigma_i^2)\)</span>. Then <span class="math inline">\(f(x_1,x_2,\dots,x_n) = f(x_1)f(x_2)\dots f(x_n)\)</span></p>
+<p><span class="math display">\[f(x_1)f(x_2)\dots f(x_n) = \int\int\dots\int f(x_1)f(x_2)\dots f(x_n) dx_1dx_2\dots dx_n = \int\int\dots\int \prod_{i=1}^n\frac{1}{\sqrt{2\pi}\sigma_i}e^{-\frac{(x_i-\mu_i)^2}{2\sigma_i^2}}dx_i =\]</span> <span class="math display">\[\int\int\dots\int\frac{1}{(2\pi)^{n/2}\prod_{i=1}^n\sqrt{\sigma_i}}e^{-\sum_{i=1}^n\frac{(x_i-\mu_i)^2}{2\sigma_i^2}}dx_1\dots dx_n\]</span> This gives us <span class="math inline">\(\prod_{i=1}^n\sqrt{\sigma_i} = \left| \det \Sigma \right|^{1/2}\)</span>. Since we already know that each <span class="math inline">\(\Sigma_{ii} = \sigma_i^2\)</span>, then the fact that the determinant of <span class="math inline">\(\Sigma\)</span> is the product of it’s diagonal entries means <span class="math inline">\(\Sigma\)</span> is at least a triangular matrix, ie the lower half of <span class="math inline">\(\Sigma\)</span> is all 0’s. Since <span class="math inline">\(\Sigma\)</span> is also symmetric, this means that <span class="math inline">\(\Sigma\)</span> is diagonal</p>
+<p>“<span class="math inline">\(\Leftarrow\)</span>” Now suppose <span class="math inline">\(\Sigma\)</span> is a diagonal matrix. Then each <span class="math inline">\(\Sigma_{ij} = 0\)</span> <span class="math inline">\(\forall i \neq j\)</span>, and <span class="math inline">\(\Sigma_{ii} = \sigma_i^2\)</span></p>
+<p><span class="math inline">\(f(x_1,x_2,\dots,x_n) = \int\int\dots\int\frac{1}{(2\pi)^{n/2}|\det(\Sigma)|^{1/2}}e^{-(\mathbf{x}-\mathbf{\mu})^T\Sigma^{-1}(\mathbf{x}-\mathbf{\mu})/2}dx_1dx_2\dots dx_n\)</span></p>
+<p>Then <span class="math inline">\(\det(\Sigma) = \prod \sigma_i\)</span>, as <span class="math inline">\(\Sigma\)</span> is diagonal, and <span class="math inline">\((\mathbf{x}-\mathbf{\mu})^T\Sigma^{-1}(\mathbf{x}-\mathbf{\mu}) = \sum_{i=1}^n (x_i-\mu_i)\sigma_i^{-1}(x_i-\mu_i) = \sum_{i=1}^n(x_i-\mu_i)^2/\sigma_i^2\)</span></p>
+<p>So, <span class="math inline">\(\int\int\dots\int\frac{1}{(2\pi)^{n/2}|\det(\Sigma)|^{1/2}}e^{-(\mathbb{x}-\mathbb{\mu})^T\Sigma^{-1}(\mathbb{x}-\mathbb{\mu})/2} = \int\int\dots\int\frac{1}{(2\pi)^{n/2}\prod_{i=1}^n\sigma_i^{1/2}}e^{-\sum_{i=1}^n(x_i-\mu_i)^2/2\sigma_i^2} = \int\int\dots\int \prod_{i=1}^n\frac{1}{\sqrt{2\pi}\sigma_i}e^{-\frac{x_i-\mu_i}{2\sigma_i^2}}dx_1dx_2\dots dx_n =\)</span></p>
+<p><span class="math inline">\(\int\int\dots\int\prod_{i=1}^nf(x_i) = f(x_1)f(x_2)\dots f(x_n)\)</span> therefore the coordinates of <span class="math inline">\(X\)</span> are independent.</p>
+</div>
+<div id="b-suppose-that-x-in-mathbbr2-and-that-sigma-is-diagonal.-show-that-the-level-curves-of-the-pdf-are-either-ellipses-or-lines.-if-the-level-curves-are-lines-what-can-you-say-about-sigma" class="section level4">
+<h4>b) Suppose that <span class="math inline">\(X \in \mathbb{R}^2\)</span> and that <span class="math inline">\(\Sigma\)</span> is diagonal. Show that the level curves of the pdf are either ellipses or lines. If the level curves are lines, what can you say about <span class="math inline">\(\Sigma\)</span>?</h4>
+</div>
+<div id="c-suppose-y-sim-mathcalnmu-sigma-and-that-x-and-y-are-independent.-x-y-will-also-be-normal.-compute-the-mean-and-covariance-matrix-of-x-y.-you-will-find-that-the-means-and-covariances-sum.-dont-just-quote-a-result-show-that-this-is-the-case.-suppose-x-in-mathbbrn-and-m-a-n-times-n-matrix.-show-that-mx-sim-mathcalnm-mu-m-sigma-mt" class="section level4">
+<h4>c) Suppose <span class="math inline">\(Y \sim \mathcal{N}(\mu', \Sigma')\)</span> and that <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span> are independent. <span class="math inline">\(X + Y\)</span> will also be normal. Compute the mean and covariance matrix of <span class="math inline">\(X + Y\)</span>. (You will find that the means and covariances sum. Don’t just quote a result, show that this is the case.) Suppose <span class="math inline">\(X \in \mathbb{R}^n\)</span> and <span class="math inline">\(M\)</span> a <span class="math inline">\(n \times n\)</span> matrix. Show that <span class="math inline">\(MX \sim \mathcal{N}(M \mu, M \Sigma M^T)\)</span></h4>
+<p>Since <span class="math inline">\(\Sigma_{ij} = cov(x_i,x_j) = E\left[(X_i - \mu_i)(X_j - \mu_j) \right]\)</span>, then <span class="math inline">\(E\left[(X_i - \mu_i)(X_j - \mu_j) \right] = 0\)</span> <span class="math inline">\(\forall i \neq j\)</span>, and by definition <span class="math inline">\(x_i,x_j\)</span> are independent.</p>
+<p>Then <span class="math inline">\(E[(X_i-\mu_i)(X_j-\mu_j)] = 0\)</span> <span class="math inline">\(\forall i\neq j\)</span>, by definition of independence. Since <span class="math inline">\(\Sigma_{ij} = cov(x_i,x_j)\)</span>, then <span class="math inline">\(\Sigma_{i,j} = 0\)</span> <span class="math inline">\(\forall i \neq j\)</span>. Each <span class="math inline">\(\Sigma_{ii} = E[(X_i-\mu_i)(X_i-\mu_i)] = \sigma_i^2\)</span>, so <span class="math inline">\(\Sigma\)</span> is a diagonal matrix.</p>
 </div>
 </div>
 
