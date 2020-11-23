@@ -1,0 +1,64 @@
+\documentclass{article}
+
+\usepackage{amssymb, amsmath, amsthm, verbatim}
+
+\begin{document}
+
+
+\renewcommand{\a}{\textbf{a}}
+\renewcommand{\b}{\textbf{b}}
+\renewcommand{\d}{\textbf{d}}
+\newcommand{\e}{\textbf{e}}
+
+\large
+
+\begin{center}
+\textbf{Homework \# 10} \\  
+\end{center}
+
+
+
+\medskip
+
+
+\newcommand{\normal}{\mathcal{N}}
+
+Reading:
+\begin{itemize}
+\item Section $13.2.1$ of Bishop discusses the Baum-Welch algorithm.
+\item Attached is the first section of the Brownian motion chapter in Durrett's Essentials of Stochastic Processes.
+\end{itemize}
+
+
+\begin{enumerate} 
+
+\item  In this problem we will again revisit the cheating casino model of Problem $1$ in homework $8$.  Please recall the notation from that problem.  There are $18$ parameters in the cheating casino model, although there are constraints on combinations of these parameters.  Let $\theta$ represent the vector formed by these parameters.  Four parameters form the transition probability matrix of $X(t)$, $6$ parameters determine the probabilities of the fair die roll,  $6$ parameters determine the probabilities of the cheating die roll, and two parameters determine the inital distribution of the hidden state, i.e. $X(0)$.   In this problem we'll consider inferring these parameters given the observed states $Y(0), Y(1), \dots, Y(200)$.   
+\begin{enumerate}
+\item First take a hard EM approach.  Assume that we assign the state of $Z(t)$ based on the smoothing probability,
+\begin{equation*}
+P(Z(t) \ | \ Y(0), Y(1), \dots, Y(200)). 
+\end{equation*}
+Derive the formulas for updating the parameters.  (In class I derived the formula for the transition probabilities, repeat this derivation, but also provide the derivation for the emission probabilities and the initial state distribution.).  Implement the hard EM algorithm and estimate the parameters.  Compare to the true parameters.
+\item Now repeat using a soft EM approach.  Derive the formulas for updating the parameters using the $Q(\theta', \theta)$ formalism.  Include a derivation for the expression of the two-step smoothing probability, 
+\begin{equation*}
+P(Z(t), Z(t+1) \ | \ Y(0), Y(1), \dots, Y(200)),
+\end{equation*}
+in terms of the forward and backward iterations developed in hw $9$.    Implement the soft EM algorithm and estimate the parameters.  Compare to the true parameters and to your result using the hard EM.
+\end{enumerate}
+
+\item Let $B(t)$ be Brownian motion with variance $\sigma^2$.
+\begin{enumerate}
+\item To get a feel for the sample paths of Brownian motion, generate a sample of $B(t)$ for i) $\sigma^2 = 1$ and ii) $\sigma^2=10$ up to time $t=10$ using a grid of width $.01$.  
+\item Let $t_1 < t_2 < t_3$.  
+\begin{enumerate}
+\item Calculate $E[B(t_1)B(t_2)]$.
+\item Calculate $E[B(t_1)B(t_2)B(t_3)]$.
+\end{enumerate}
+\end{enumerate}
+
+\end{enumerate}
+
+
+
+
+\end{document}

@@ -1,0 +1,438 @@
+---
+title: "Math 611 HW10"
+author: "Jeff Gould"
+date: "11/3/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+```{r }
+
+SampleCasino <- function(bigT){
+  
+  X_t <- c("Fair", rep(NA, bigT))
+  
+  for (j in 2:(bigT+1)) {
+    if(X_t[j-1] == "Fair"){
+      X_t[j] = sample(c("Fair", "Cheat"), 1, prob = c(0.95, 0.05))
+    }else{
+      X_t[j] = sample(c("Fair", "Cheat"), 1, prob = c(0.05, 0.95))
+    }
+    
+  }
+  
+  Y_t <- sapply(X_t, function(x){
+    if(x == "Fair"){
+      return(sample(1:6, 1))
+    }else{
+      return(sample(1:6, 1, prob = c(49/250, 49/250, 49/250, 49/250, 49/250, 1/50)))
+    }
+  })
+  
+  return(data.frame(t = c(0:bigT),
+                    X = X_t,
+                    Y = Y_t))
+  
+}
+
+set.seed(1234)
+testSample <- SampleCasino(200)
+
+
+```
+
+
+
+### a)
+
+See attached for math
+
+
+
+
+
+
+
+```{r }
+
+Forward <- function(Y, theta){
+  
+  M <- theta[["M"]]
+  G <- theta[["G"]]
+  pi <- theta[["pi"]]
+  
+  alpha <- matrix(NA, nrow = length(Y), ncol = nrow(M))
+  
+  C  <- sum(pi * G[,Y[1]])
+  
+  alpha[1, ] = G[, Y[1] ] * t(pi) / C
+  
+  for (t in 2:nrow(testSample)) {
+    c_n <- alpha[t-1, ] %*% M %*% G[,Y[t]]
+    C <- c(C, c_n)
+    alpha[t, ] <- G[,Y[t]] * (alpha[t-1, ] %*% M) / as.numeric(c_n)
+  }
+  
+  return(cbind(alpha, C))
+  
+}
+ 
+Backward = function(Y, theta, C){
+  
+  M <- theta[["M"]]
+  G <- theta[["G"]]
+  bigT = length(Y)
+  m = nrow(M)
+  beta = matrix(1, bigT, m)
+  
+  for(t in (bigT-1):1){
+    tmp = as.matrix(beta[t+1, ] * G[, Y[t+1]])
+    beta[t, ] = t(M %*% tmp) / C[t+1]
+  }
+  return(beta)
+}
+
+ForwardBackward <- function(Y, theta){
+  
+  alpha <- Forward(Y = Y, theta = theta)
+  C <- alpha[,3]
+  alpha = alpha[,1:2]
+  beta <- Backward(Y = Y, theta = theta, C = C)
+  
+  return(alpha * beta)
+  
+}
+
+```
+
+```{r }
+
+update <- function(Y, Z){
+  N <- length(Y)
+  
+  N1 <- sum(Z[-N] == 0) ## The number of times the hidden state is in state 1, less the last step
+  N2 <- sum(Z[-N] == 1) ## The number of times the hidden state is in state 2, less the last step
+  
+  M11 <- 0
+  M12 <- 0
+  M22 <- 0
+  M21 <- 0
+  
+  
+  for (i in 1:(length(Z)-1)) { ## Calculate the number of times the hidden state is in state 1 and stays in state 1
+    M11 <- M11 + (Z[i] == 0 & Z[i+1] == 0)
+  }
+  
+  for (i in 1:(length(Z)-1)) { ## Calculate the number of times the hidden state is in state 1 and moves to state 2
+    M12 <- M12 + (Z[i] == 0 & Z[i+1] == 1)
+  }
+  
+  for (i in 1:(length(Z)-1)) { ## Calculate the number of times the hidden state is in state 2 and stays in state 2
+    M22 <- M22 + (Z[i] == 1 & Z[i+1] == 1)
+  }
+  
+  for (i in 1:(length(Z)-1)) { ## Calculate the number of times the hidden state is in state 2 and moves to state 1
+    M21 <- M21 + (Z[i] == 1 & Z[i+1] == 0)
+  }
+  
+
+  M11 <- M11 / N1 ## Divide all to get transition probabilites
+  M12 <- M12 / N1
+  M22 <- M22 / N2
+  M21 <- M21 / N2
+  
+  M <- matrix(c(M11, M12,
+                M21, M22), byrow = T, nrow = 2)
+  
+  Y0 <- Y[Z==0] ## Y for hidden state is fair
+  Y1 <- Y[Z==1] ## Y for hidden state is cheating
+  
+  g0 <- sapply(1:6, function(x){mean(Y0==x)})  ## get probabilites for each state
+  g1 <- sapply(1:6, function(x){mean(Y1==x)})
+  
+  #g0 <- (g0 + 0.02) / sum(g0 + 0.02)
+  #g1 <- (g1 + 0.02) / sum(g1 + 0.02)
+  
+  # g0 <- g0  / sum(g0)
+  # g1 <- (g1) / sum(g1)
+  
+  G <- matrix(c(g0, g1), nrow = 2, byrow = T)
+  
+  pi <- matrix(data = c(Z[1] == 0, Z[1] == 1), nrow = 2) %>% as.numeric()
+  
+  theta <- list(M = M,
+                G = G,
+                pi = pi)
+  return(theta)
+  
+}
+
+
+
+HardEM <- function(Y, starting_Z = NULL, max_iter = 100){
+  iter <- 0
+  
+  if(is.null(starting_Z)){
+    Z = sample(x = c(0,1), size = length(Y), replace = T)
+  }else{
+    Z <- starting_Z
+  }
+  
+  while(iter < max_iter){
+    
+    theta <- update(Y = Y, Z = Z)
+    
+    Z <- ForwardBackward(Y = Y, theta = theta)
+    Z <- round(Z)[,2]
+    
+    iter <- iter + 1
+  }
+  
+  return(list(
+    theta = theta,
+    Z = Z
+  ))
+  
+  
+  
+}
+
+Y <- testSample$Y
+
+set.seed(123)
+init_Z <- as.numeric(testSample$X == "Cheat")
+t <- seq(1,201,20)
+init_Z[t] = (init_Z[t] + 1) %% 2
+
+test <- HardEM(Y = Y, starting_Z = init_Z, max_iter = 50)
+test$theta
+
+
+
+```
+
+
+
+
+
+### b)
+
+See attached for math
+
+```{r }
+
+### Initialize theta parameters
+
+M <- matrix(c(0.85, 0.15,
+              0.15, 0.85), nrow = 2, byrow = T)
+pi <- matrix(c(0.8, 0.2), nrow = 2)
+set.seed(1)
+g1 <- runif(6)
+g2 <- runif(6)
+
+G <- matrix(c((g1 + 1)/sum(g1 + 1), (g2 + 0.05) / sum(g2 + 0.05)), nrow = 2, byrow = T)
+
+init_theta <- list(
+  M = M,
+  pi = pi,
+  G = G
+)
+
+
+updateSoft <- function(Y, Z, theta){
+  
+  M_prime <- theta$M
+  G_prime <- theta$G
+  pi_prime <- theta$pi
+  
+  N <- length(Y) - 1
+  
+  alpha <- Forward(Y, theta) ## get the forward/backward probabilities
+  beta <- Backward(Y, theta, alpha[,3])
+  alpha <- alpha[,1:2]
+  
+  psi11 <- rep(0, N)
+  
+  for (t in 1:N) { ## create psi vector for in state 1 and stays in state 1
+    psi11[t] <- as.numeric(alpha[t, 1] * beta[t+1, 1] * M[1,1] * G_prime[1 ,Y[t+1]])
+  }
+  
+  psi12 <- rep(0, N)
+  
+  for (t in 1:N) { ## create psi vector for in state 1 and moves to state 2
+    psi12[t] <- as.numeric(alpha[t, 1] * beta[t+1, 1] * M[1,2] * G_prime[2,Y[t+1]])
+  }
+  
+  M11 <- sum(psi11) / sum(psi11, psi12)  ## normalize
+  M12 <- sum(psi12) / sum(psi11, psi12)
+    
+  
+  psi22 <- rep(0, N)
+  
+  for (t in 1:N) { ## create psi vector for in state 2 and stays in state 2
+    psi22[t] <- as.numeric(alpha[t, 2] * beta[t+1, 2] * M[2,2] *G_prime[2,Y[t+1]])
+  }
+  
+  psi21 <- rep(0, N)
+  
+  for (t in 1:N) {  ## create psi vector for in state 2 and moves to state 1
+    psi21[t] <- as.numeric(alpha[t, 2] * beta[t+1, 1] * M[2,1] *  G_prime[1,Y[t+1]])
+  }
+  
+  M21 <- sum(psi21) / sum(psi21, psi22)
+  M22 <- sum(psi22) / sum(psi21, psi22)
+  
+  M_update <- matrix(c(M11, M12,
+                       M21, M22), byrow = T, nrow = 2)
+  
+  g1 <- sapply(1:6, function(x){
+    sum(Z[,1] * (Y == x)) / (sum(Z[,1]))
+  })
+  
+  g2 <- sapply(1:6, function(x){
+    sum(Z[,2] * (Y == x)) / (sum(Z[,2]))
+  })
+  
+  G_update <- matrix(c(g1, g2), byrow = T, nrow = 2)
+  
+  pi_update <- matrix(Z[1,], nrow = 2)
+  
+  theta_new <- list(M = M_update,
+                    G = G_update,
+                    pi = pi_update)
+  
+  return(theta_new)
+  
+}
+
+
+
+
+
+softEM <- function(Y, start_theta, max_iter){
+  
+  iter <- 0
+  theta <- start_theta
+  while(iter < max_iter){
+    Z <- ForwardBackward(Y = Y, theta = theta)
+    
+    theta <- updateSoft(Y, Z, theta = theta)
+    
+    iter <- iter + 1
+    
+  }
+  
+  return(list(Z = Z,
+              theta = theta))
+  
+  
+  
+}
+
+testB <- softEM(Y = testSample$Y, start_theta = init_theta, max_iter = 100)
+
+testB$theta
+
+results <- data.frame(p_cheating = testB$Z[,2],
+                      Y_t = testSample$Y,
+                      X_t = as.numeric(testSample$X == "Cheat"),
+                      t = seq(0, 200))
+
+results %>%
+  mutate(is_6 = ifelse(Y_t == 6, 1, 0),
+         X_t = as.factor(X_t)) %>%
+  ggplot(aes(x = t)) +
+  geom_point(aes(y = is_6, color = X_t)) +
+  theme_bw() +
+  geom_line(aes(y =  p_cheating)) +
+  labs( y = "P(Cheat)")
+
+```
+
+
+
+
+## 2
+
+### a) To get a feel for the sample paths of Brownian motion, generate a sample of $B(t)$ for i) $\sigma^2 = 1$ and ii) $\sigma^2=10$ up to time $t=10$ using a grid of width $.01$.  
+
+
+```{r }
+
+BrownianMotion <- function(t, delta_t, sigma2){
+  
+  intervals <- t / delta_t
+  
+  X <- c(0, rnorm(n = intervals, sd = sqrt(sigma2 * delta_t)))
+  
+  X <- data.frame(X = cumsum(X),
+                  t = seq(0, t, delta_t))
+  
+  return(X)
+  
+  
+  
+}
+
+set.seed(1)
+BM1 <- BrownianMotion(t = 10, delta_t = 0.01, sigma2 = 1)
+
+ggplot(BM1, aes(x = t, y = X)) +
+  geom_line() +
+  theme_bw()
+
+set.seed(2)
+BM2 <- BrownianMotion(t = 10, delta_t = 0.01, sigma2 = 10)
+
+
+ggplot(BM2, aes(x = t, y = X)) +
+  geom_line() +
+  theme_bw()
+
+
+left_join(BM1, BM2, by = c("t" = "t")) %>%
+  ggplot(aes(x = X.x, y = X.y)) +
+  geom_path() +
+  theme_bw()
+
+```
+
+
+### b) Let $t_1 < t_2 < t_3$.  
+
+* Calculate $E[B(t_1)B(t_2)]$.
+
+$B(t_2) = B(t_1) + \mathcal{N}(0, (t_2 - t_1)\sigma^2)$
+
+$E[B(t_1)B(t_2)] = E[B(t_1)(B(t_1) + \mathcal{N}(0, (t_2 - t_1)\sigma^2))] = E[B(t_1)B(t_1)] + E[B(t_1)\mathcal{N}(0, (t_2 - t_1)\sigma^2))] = E[B(t_1)^2]$
+
+$E[B(t_1)^2] = Var[B(t_1)^2] + E[B(t_1)]^2 = t_1\sigma^2$
+
+
+* Calculate $E[B(t_1)B(t_2)B(t_3)]$.
+
+$B(t_2) = B(t_1) + [B(t_2)- B(t_1)]$
+
+$B(t_3) = B(t_2) + [B(t_3) - B(t_2)] = B(t_1) + [B(t_2)- B(t_1)] + [B(t_3) - B(t_2)]$
+
+$E[B(t_1)B(t_2)B(t_3)] = E\left[B(t_1)[B(t_1) + [B(t_2)- B(t_1)]][B(t_1) + [B(t_2)- B(t_1)] + [B(t_3) - B(t_2)]] \right]$
+
+Let $x_1 = B(t_1)$, $x_2 = B(t_2) - B(t_1)$, and $x_3 = B(t_3) - B(t_2)$
+
+Then $E[x_1] = E[x_2] = E[x_3] = 0$, and all are independent
+
+$E[B(t_1)B(t_2)B(t_3)] = E\left[B(t_1)[B(t_1) + [B(t_2)- B(t_1)]][B(t_1) + [B(t_2)- B(t_1)] + [B(t_3) - B(t_2)]] \right] =$
+
+$E[x_1(x_1 + x_2)(x_1 + x_2 + x_3)] = E[x_1^3 + 2x_1^2x_2 + x_1x_2^2 + x_1^3x_3 + x_1x_2x_3] = E[x_1^3] + E[2x_1^2x_2] + E[x_1x_2^2] + E[x_1^3x_3] + E[x_1x_2x_3] = E[x_1^3] = E[B(t_1)^3] =0$
+
+Where $E[B(t_1)^3] =0$ follows from the third moment of a normal r.v. with mean 0 is 0.
+
+
+
+
+
